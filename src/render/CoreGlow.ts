@@ -66,11 +66,14 @@ export class CoreGlow {
     this.time += dt;
     this.strength += (this.target - this.strength) * (1 - Math.exp(-dt * 2.2));
 
-    for (const layer of this.layers) {
+    for (let i = 0; i < this.layers.length; i++) {
+      const layer = this.layers[i];
       layer.material.opacity = layer.baseOpacity * this.strength;
       layer.sprite.visible = this.strength > 0.01;
-      // A slow breath keeps it alive without reading as a flicker.
-      const breathe = 1 + Math.sin(this.time * 0.31 * layer.spin * 12) * 0.03;
+      // A slow breath keeps it alive without reading as a flicker. The rate is
+      // per-layer and deliberate — deriving it from `spin` made the period
+      // around ninety seconds, which is indistinguishable from static.
+      const breathe = 1 + Math.sin(this.time * (0.34 + i * 0.11) + i * 2.1) * 0.028;
       layer.sprite.scale.setScalar(layer.baseScale * breathe);
       layer.sprite.material.rotation = this.time * layer.spin;
     }

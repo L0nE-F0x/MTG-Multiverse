@@ -67,7 +67,15 @@ try {
   const introDismissed = await page.evaluate(() => {
     let clicked = false;
     document.querySelectorAll('button').forEach((b) => {
-      if (/enter the universe/i.test(b.textContent ?? '')) { b.click(); clicked = true; }
+      if (!/enter the universe/i.test(b.textContent ?? '')) return;
+      // The overlay is built once and toggled by class, so the button exists
+      // even when closed. Only treat it as open if it is actually rendered,
+      // otherwise this reports a dismissal that never needed to happen.
+      const rect = b.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      if (getComputedStyle(b).visibility === 'hidden') return;
+      b.click();
+      clicked = true;
     });
     return clicked;
   });
@@ -177,6 +185,27 @@ try {
     searchResults.first ? `top hit "${searchResults.first}"` : '');
   check('search ranks the exact name first', searchResults.first === 'Lightning Bolt',
     `got "${searchResults.first}"`);
+
+  // --- every layout renders --------------------------------------------------
+  // Clear the search first: the query above narrows the field to a handful of
+  // cards, which would make the "something is visible" assertion meaningless.
+  await page.evaluate(() => {
+    window.__mcu.store.patchFilter({ query: '' });
+    window.__mcu.store.set('results', new Int32Array(0));
+  });
+  await sleep(500);
+
+  for (const layout of ['timeline', 'sets', 'colorwheel', 'sphere', 'price', 'galaxy']) {
+    await page.evaluate((m) => window.__mcu.store.set('layout', m), layout);
+    await sleep(2600);
+    const state = await page.evaluate(() => ({
+      layout: window.__mcu.store.state.layout,
+      fps: window.__mcu.store.state.stats.fps,
+      visible: window.__mcu.store.state.matchCount,
+    }));
+    check(`layout "${layout}" renders`, state.layout === layout && state.fps > 0 && state.visible > 100000,
+      `${state.fps} fps, ${state.visible.toLocaleString()} visible`);
+  }
 
   check('no uncaught page errors', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 } finally {

@@ -27,7 +27,7 @@ class TrailPass extends Pass {
   private readonly blendMaterial: THREE.ShaderMaterial;
   private readonly copyMaterial: THREE.ShaderMaterial;
 
-  constructor(amount = 0.72) {
+  constructor(amount = 0.45) {
     super('TrailPass');
     this.needsSwap = true;
 
@@ -139,7 +139,10 @@ export function createPostChain(
   const composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType });
   composer.addPass(new RenderPass(scene, camera));
 
-  const trail = new TrailPass(0.7);
+  // 0.45 decays to nothing within a few frames. Anything stronger ghosts the
+  // star labels into unreadable smears, which reads as a rendering fault rather
+  // than a deliberate effect.
+  const trail = new TrailPass(0.45);
   trail.enabled = false;
   composer.addPass(trail);
 
