@@ -189,6 +189,16 @@ export class Starfield {
     this.material.uniforms.uFilterMorph.value = 0;
   }
 
+  /**
+   * Raw position buffers, for bulk scans that cannot afford a call per card.
+   * `positionOf` is the right API for single lookups; this exists because the
+   * billboard selector walks all 117k every tick and the per-call overhead
+   * showed up.
+   */
+  get positionBuffers(): { a: Float32Array; b: Float32Array; morph: number } {
+    return { a: this.posA, b: this.posB, morph: this.morph };
+  }
+
   /** Current world position of a card, accounting for an in-flight morph. */
   positionOf(i: number, out: THREE.Vector3): THREE.Vector3 {
     const o = i * 3;

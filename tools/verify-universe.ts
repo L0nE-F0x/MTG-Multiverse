@@ -53,6 +53,10 @@ async function main(): Promise<void> {
 
   const N = meta.count;
   check(N > 0, 'meta.count is not positive');
+  // The raw Scryfall default_cards dump this pipeline is built from has
+  // 117,621 lines, all `object: "card"`; none are dropped (art_series and
+  // foreign-only-printing rows are kept, not filtered out).
+  check(N === 117_621, `expected exactly 117,621 cards (raw dump line count, none dropped), got ${N}`);
 
   // --- 1. Column offsets: bounds, 4-byte alignment, no overlap -----------
 
@@ -276,6 +280,84 @@ async function main(): Promise<void> {
     check(d.colors === 'C', `Island: expected no cast colors (it has no mana cost), got ${d.colors}`);
     check(d.colorIdentity === 'U', `Island: expected blue color identity (taps for U), got ${d.colorIdentity}`);
   }
+
+  // --- 4b. Foreign-only printings and art-series cards --------------------
+  // Scryfall's default_cards dump carries one row per printing in English,
+  // or in the printed language when a card has NO English printing at all.
+  // Those non-English rows, and art_series (Secret Lair / set-booster art
+  // card) rows, are real distinct printed cards and must be present -- the
+  // universe must NOT be built as if every card is English or has a game
+  // type_line.
+
+  // Foreign Black Border (fbb) -- French Island, printed_name "Ile" must be
+  // interned as-is (not the English Oracle name "Island").
+  const fbbIdx = findByUuid('001eb913-2afe-4d7d-89a1-7c35de92d702');
+  check(fbbIdx !== -1, 'fbb Island (French, no English printing) not found in universe');
+  if (fbbIdx !== -1) {
+    const d = decode(fbbIdx);
+    console.log('fbb (Foreign Black Border) Island:', d);
+    check(d.set === 'fbb', `fbb Island: expected set "fbb", got "${d.set}"`);
+    check(d.name === 'Ile', `fbb Island: expected French printed_name "Ile", got "${d.name}"`);
+    check((d.typeMask & TYPE_BIT.land) !== 0, 'fbb Island: expected land type bit');
+  }
+
+  // Rinascimento (rin) -- Italian-exclusive reprint set, printed_name carries
+  // the actual Italian name and must be interned as-is (not the English name).
+  const rinIdx = findByUuid('00fe59e8-d1ab-4f74-a7f4-a8feca3705ee');
+  check(rinIdx !== -1, "Rinascimento Urza's Power Plant not found in universe");
+  if (rinIdx !== -1) {
+    const d = decode(rinIdx);
+    console.log('rin (Rinascimento) Centrale Energetica di Urza:', d);
+    check(d.set === 'rin', `rin card: expected set "rin", got "${d.set}"`);
+    check(
+      d.name === 'Centrale Energetica di Urza',
+      `rin card: expected Italian printed_name "Centrale Energetica di Urza", got "${d.name}"`,
+    );
+  }
+
+  // Secrets of Strixhaven Mystical Archive (soa) -- Japanese-exclusive
+  // printed_name, non-Latin script interned exactly as-is.
+  const soaIdx = findByUuid('00f97ece-f7c5-4ae9-b680-40f2cbbed22c');
+  check(soaIdx !== -1, 'soa Crop Rotation (Japanese) not found in universe');
+  if (soaIdx !== -1) {
+    const d = decode(soaIdx);
+    console.log('soa (Mystical Archive) 輪作:', d);
+    check(d.set === 'soa', `soa card: expected set "soa", got "${d.set}"`);
+    check(d.name === '輪作', `soa card: expected Japanese printed_name "輪作", got "${d.name}"`);
+  }
+
+  // An art_series card: physically printed (Secret Lair / set booster art
+  // card), must carry the artSeries type bit, and since its type_line is a
+  // non-game "Card" / "Card // Card" it must have NO other game type bits
+  // (in particular not `token`, a distinct category) -- typeMask consisting
+  // of exactly one bit is expected and fine, not a defect.
+  const artIdx = findByUuid('000225fc-9bc3-4eb3-905e-02c19c873b0b');
+  check(artIdx !== -1, 'art_series card (Fell Beast\'s Shriek) not found in universe');
+  if (artIdx !== -1) {
+    const d = decode(artIdx);
+    console.log("art_series Fell Beast's Shriek:", d);
+    check((d.typeMask & TYPE_BIT.artSeries) !== 0, 'art_series card: expected artSeries type bit');
+    check((d.typeMask & TYPE_BIT.token) === 0, 'art_series card: must NOT have the token bit set');
+    check(
+      (d.typeMask & ~TYPE_BIT.artSeries) === 0,
+      `art_series card: expected no other type bits set alongside artSeries, got mask ${d.typeMask}`,
+    );
+  }
+
+  // Aggregate: art_series cards are a known, fixed count in this dump (they
+  // are kept, not dropped) and every one of them must carry the artSeries
+  // bit -- and nothing outside that count should carry it.
+  let artSeriesBitCount = 0;
+  let artSeriesWithTokenBit = 0;
+  for (let i = 0; i < N; i++) {
+    const mask = readTypeMask(i);
+    if ((mask & TYPE_BIT.artSeries) !== 0) {
+      artSeriesBitCount++;
+      if ((mask & TYPE_BIT.token) !== 0) artSeriesWithTokenBit++;
+    }
+  }
+  check(artSeriesBitCount === 2650, `expected exactly 2,650 cards with the artSeries bit set, got ${artSeriesBitCount}`);
+  check(artSeriesWithTokenBit === 0, `${artSeriesWithTokenBit} art_series cards incorrectly also have the token bit set`);
 
   // --- 5. Distributions -----------------------------------------------
 

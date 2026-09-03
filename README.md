@@ -1,6 +1,6 @@
 # Magic Card Universe
 
-Every Magic: The Gathering card ever printed — 112,326 of them — rendered as a
+Every Magic: The Gathering card ever printed — 117,621 of them — rendered as a
 galaxy you can fly through.
 
 Nothing about the layout is decorative. A card's position *is* its data:
@@ -13,6 +13,10 @@ Nothing about the layout is decorative. A card's position *is* its data:
 | Star size & brightness | Popularity (EDHREC rank), weighted by rarity — Black Lotus is a supergiant |
 | Star colour | Blended colour identity; gold mixed in with colour count |
 | Halo | Colourless artifacts, which belong to no arm |
+
+Fly in close and the actual card art materialises around you. Hover any star for
+its name, click it to open the card, and the URL updates so the view is
+shareable.
 
 The volumetric nebula is generated from the *same* spiral function the stars are
 placed with, so the gas genuinely follows the arms and is tinted by whichever
@@ -27,8 +31,11 @@ npm run data:build     # streams it into public/data/{universe.bin,universe-meta
 npm run dev            # http://127.0.0.1:5173
 ```
 
-`npm run data:build` takes about a minute and produces a 5.3 MB binary plus an
-816 KB metadata file. Card images are not stored — they are reconstructed from
+`npm run data:build` takes about a minute and produces a 5.8 MB binary plus a
+971 KB metadata file. It keeps everything Scryfall lists as a distinct printing,
+including cards with no English printing at all (Foreign Black Border,
+Rinascimento, Salvat, the Japanese Mystical Archive) under their printed names,
+and Secret Lair art cards. Card images are not stored — they are reconstructed from
 each card's UUID against Scryfall's CDN and fetched on demand.
 
 Other commands:
@@ -37,7 +44,11 @@ Other commands:
 npm run build                       # typecheck + production bundle
 node tools/verify-universe.ts       # asserts the generated data is sane
 node tools/screenshot.mjs --out shot.png   # headless capture, for iterating on visuals
+npm run test:interaction            # drives real mouse/keyboard against the dev server
+npm run og                          # regenerate the social preview image
 ```
+
+`npm run dev` must be running for the last two.
 
 ## Layouts
 
@@ -62,6 +73,8 @@ src/
   layout/            the six position generators + the star palette
   render/            starfield, nebula, GPU picker, post chain, noise volume
   shaders/           GLSL, with a shared lib/common.glsl
+  core/urlState.ts   ?card= / ?layout= deep links, both directions
+  render/CardBillboards.ts  real card art, drawn at the stars when you get close
   ui/                overlays; imports the store and nothing else
 tools/               offline pipeline + capture harness (Node, run directly)
 ```

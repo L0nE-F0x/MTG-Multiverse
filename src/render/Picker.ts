@@ -27,13 +27,14 @@ export class Picker {
     this.material = new THREE.ShaderMaterial({
       vertexShader: pickVert,
       fragmentShader: pickFrag,
+      glslVersion: THREE.GLSL3, // needs gl_FragDepth, which GLSL1 lacks
       uniforms: {
         uMorph: starfield.material.uniforms.uMorph,
         uFilterMorph: starfield.material.uniforms.uFilterMorph,
         uStarSize: starfield.material.uniforms.uStarSize,
         uSizeScale: { value: 600 },
-        uMinPixels: { value: 5.0 },
-        uPickRadius: { value: 1.35 },
+        uMinPixels: { value: 4.0 },
+        uPickRadius: { value: 1.15 },
       },
       depthTest: true,
       depthWrite: true,

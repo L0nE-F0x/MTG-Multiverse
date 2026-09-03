@@ -9,3 +9,16 @@
 
 [build.environment]
   NODE_VERSION = "22"
+
+# The generated data is content-addressed by nothing, so it must revalidate;
+# but it changes only when the pipeline is re-run, so allow a short cache.
+[[headers]]
+  for = "/data/*"
+  [headers.values]
+    Cache-Control = "public, max-age=600, must-revalidate"
+
+# Hashed bundle filenames change whenever the contents do.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

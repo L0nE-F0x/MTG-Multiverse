@@ -4,6 +4,7 @@ import { store, type LayoutMode, type VisualState } from './store.ts';
 import { Starfield } from '../render/Starfield.ts';
 import { Nebula } from '../render/Nebula.ts';
 import { Picker } from '../render/Picker.ts';
+import { CardBillboards } from '../render/CardBillboards.ts';
 import { createPostChain, type PostChain } from '../render/post.ts';
 import type { Universe } from '../data/universe.ts';
 
@@ -37,6 +38,7 @@ export class App {
   private readonly camera: THREE.PerspectiveCamera;
   private readonly nebula: Nebula;
   private readonly picker: Picker;
+  private readonly billboards: CardBillboards;
   private readonly post: PostChain;
   private readonly universe: Universe;
   private readonly canvas: HTMLCanvasElement;
@@ -81,8 +83,11 @@ export class App {
     this.nebula = new Nebula(0.5);
     this.picker = new Picker(this.starfield);
 
+    this.billboards = new CardBillboards(universe, this.starfield, this.mask);
+
     this.scene.add(this.nebula.compositeMesh);
     this.scene.add(this.starfield.points);
+    this.scene.add(this.billboards.group);
 
     this.post = createPostChain(this.renderer, this.scene, this.camera);
 
@@ -254,6 +259,10 @@ export class App {
     this.starfield.update(dt, time);
     this.nebula.update(dt);
 
+    this.billboards.update(
+      dt, this.camera, this.rig.distance, store.state.hovered, store.state.selected,
+    );
+
     this.nebula.render(this.renderer, this.camera, time);
     this.post.composer.render(dt);
 
@@ -337,6 +346,7 @@ export class App {
     this.starfield.dispose();
     this.nebula.dispose();
     this.picker.dispose();
+    this.billboards.dispose();
     this.post.dispose();
     this.renderer.dispose();
   }

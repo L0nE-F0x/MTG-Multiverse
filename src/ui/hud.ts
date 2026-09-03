@@ -21,11 +21,20 @@ const LAYOUTS: { mode: LayoutMode; label: string; desc: string }[] = [
   { mode: 'price', label: 'Price', desc: 'Value landscape' },
 ];
 
-export function mountHud(root: HTMLElement, universe: Universe): HudHandle {
+export function mountHud(root: HTMLElement, universe: Universe, onAbout: () => void): HudHandle {
   // ---- Command bar --------------------------------------------------
   const countN = el('span', { className: 'mcu-command-count-n' });
+  const aboutBtn = el('button', {
+    className: 'mcu-about-btn',
+    text: '?',
+    attrs: { type: 'button', 'aria-label': 'About Magic Card Universe' },
+  });
+  aboutBtn.addEventListener('click', onAbout);
   const commandBar = el('div', { className: 'mcu-command-bar' }, [
-    el('div', { className: 'mcu-wordmark', text: 'MAGIC CARD UNIVERSE' }),
+    el('div', { className: 'mcu-command-bar-top' }, [
+      el('div', { className: 'mcu-wordmark', text: 'MAGIC CARD UNIVERSE' }),
+      aboutBtn,
+    ]),
     el('div', { className: 'mcu-command-count' }, [
       countN,
       document.createTextNode(' of '),

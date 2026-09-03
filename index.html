@@ -3,8 +3,31 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-    <title>Magic Card Universe</title>
-    <meta name="description" content="Every Magic: The Gathering card ever printed, rendered as an explorable galaxy." />
+    <title>Magic Card Universe — every Magic card ever printed, as a galaxy</title>
+    <meta name="description" content="All 117,621 Magic: The Gathering cards ever printed, rendered as one explorable 3D galaxy. Spiral arms are colour identity, distance from the core is release date, and the brightest stars are the cards you know." />
+    <meta name="theme-color" content="#05060d" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href="%SITE_URL%/" />
+
+    <!-- Social preview. %SITE_URL% is substituted at build time by the plugin in
+         vite.config.ts, from Netlify's DEPLOY_PRIME_URL / URL. Absolute URLs are
+         required here: WhatsApp in particular will not resolve a relative
+         og:image. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Magic Card Universe" />
+    <meta property="og:url" content="%SITE_URL%/" />
+    <meta property="og:title" content="Magic Card Universe" />
+    <meta property="og:description" content="All 117,621 Magic: The Gathering cards ever printed, rendered as one explorable 3D galaxy. Spiral arms are colour identity, distance from the core is release date, and the brightest stars are the cards you know." />
+    <meta property="og:image" content="%SITE_URL%/og.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="A spiral galaxy made of Magic: The Gathering cards, with five arms coloured white, blue, violet, red and green." />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Magic Card Universe" />
+    <meta name="twitter:description" content="All 117,621 Magic: The Gathering cards ever printed, rendered as one explorable 3D galaxy." />
+    <meta name="twitter:image" content="%SITE_URL%/og.jpg" />
     <style>
       /* Base shell only. Everything else lives in src/styles/, owned by the UI layer. */
       :root { color-scheme: dark; }

@@ -51,6 +51,17 @@ re-running `data:build` — the loader refuses a mismatched version on purpose.
 - **Star brightness is energy-conserving.** When a star clamps up to the minimum
   readable pixel size, the vertex shader dims it by the area it got for free.
   Remove that and the far side of the disc becomes a solid white sheet.
+- **The pick shader writes disc-relative depth, not camera depth.** `gl_FragDepth
+  = distance from the sprite's own centre` makes the depth test resolve to "the
+  star whose centre is nearest the cursor". With real camera depth, dense regions
+  selected whatever happened to be closest to the eye — you would aim at Black
+  Lotus and get whatever floated in front of it. Nothing occludes anything in an
+  additively-blended starfield, so camera depth carries no meaning here. This is
+  also why `pick.frag` is GLSL3: GLSL1 has no `gl_FragDepth`.
+- **A translucent background cannot mask scrolled content.** The intro's sticky
+  CTA used `var(--mcu-panel-bg)` (0.78 alpha) and the controls list showed
+  straight through it. Anything that has to occlude needs a near-opaque colour,
+  even inside an already-frosted panel.
 - Exposure is a uniform on the star material, not `renderer.toneMappingExposure`
   — tone mapping happens in the post chain, so the renderer's own is inert.
 
@@ -94,5 +105,17 @@ years were dense; and concentric rings keyed to *day of year* stayed mostly
 empty, because Magic ships in four to six bursts a year rather than continuously.
 Ranking cards within their year fills the ring while staying monotone in date.
 
-Use `tools/screenshot.mjs` to iterate — it drives the system Chromium headless
-against the dev server and reports the WebGL renderer and current fps.
+## Testing
+
+`npm run test:interaction` drives real mouse and keyboard input through Chrome
+DevTools against the dev server. It exists because the interesting failures all
+live between the input and the store — GPU picking reading the wrong pixel, the
+pick buffer being scaled by devicePixelRatio, click-versus-drag disambiguation —
+and none of them are visible if you only set store state programmatically. It
+caught the picking bug above, which had looked fine in every screenshot.
+
+Use `tools/screenshot.mjs` to iterate on visuals — it drives the system Chromium
+headless against the dev server and reports the WebGL renderer and current fps.
+It suppresses the intro overlay by default (`--intro` keeps it), and `--eval-file`
+runs a script against the page before capturing, which is how the social image is
+composed (`npm run og`). Output is JPEG when the path ends in `.jpg`.

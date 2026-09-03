@@ -8,7 +8,7 @@
  * software rendering if the GPU path cannot start.
  */
 import puppeteer from 'puppeteer-core';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import process from 'node:process';
 
 const args = Object.fromEntries(
@@ -53,6 +53,14 @@ async function capture(flags, label) {
     const page = await browser.newPage();
     await page.setViewport({ width: WIDTH, height: HEIGHT, deviceScaleFactor: 1 });
 
+    // Suppress the intro overlay before any page script runs. Setting it after
+    // load is too late: the overlay opens the moment `ready` flips.
+    if (!args.intro) {
+      await page.evaluateOnNewDocument(() => {
+        try { localStorage.setItem('mcu.introSeen', '1'); } catch { /* private mode */ }
+      });
+    }
+
     const logs = [];
     page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
     page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
@@ -67,14 +75,21 @@ async function capture(flags, label) {
       // console log usually says exactly what failed.
       const bootLabel = await page.evaluate(() => document.getElementById('boot-label')?.textContent);
       console.error(`[${label}] BOOT STALLED. boot-label="${bootLabel}"`);
-      await page.screenshot({ path: OUT, type: 'png' });
+      const type = OUT.endsWith('.jpg') || OUT.endsWith('.jpeg') ? 'jpeg' : 'png';
+    await page.screenshot({
+      path: OUT,
+      type,
+      ...(type === 'jpeg' ? { quality: Number(args.quality ?? 88) } : {}),
+    });
       console.error('--- console ---\n' + logs.slice(-40).join('\n'));
       return false;
     }
 
-    if (args.eval && typeof args.eval === 'string') {
-      await page.evaluate(args.eval);
-    }
+    // --eval-file avoids shell-quoting gymnastics for anything non-trivial.
+    const script = args['eval-file']
+      ? readFileSync(args['eval-file'], 'utf8')
+      : typeof args.eval === 'string' ? args.eval : null;
+    if (script) await page.evaluate(script);
     await new Promise((r) => setTimeout(r, SETTLE));
 
     const renderer = await page.evaluate(() => {
@@ -84,7 +99,12 @@ async function capture(flags, label) {
     });
     const fps = await page.evaluate(() => window.__mcu.store.state.stats.fps);
 
-    await page.screenshot({ path: OUT, type: 'png' });
+    const type = OUT.endsWith('.jpg') || OUT.endsWith('.jpeg') ? 'jpeg' : 'png';
+    await page.screenshot({
+      path: OUT,
+      type,
+      ...(type === 'jpeg' ? { quality: Number(args.quality ?? 88) } : {}),
+    });
     console.error(`[${label}] renderer=${renderer} fps=${fps} -> ${OUT}`);
     const noise = logs.filter((l) => !/vite|hmr|Download the React/i.test(l));
     if (noise.length) console.error('--- console ---\n' + noise.slice(0, 30).join('\n'));

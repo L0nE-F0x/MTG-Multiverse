@@ -1,6 +1,7 @@
 import { store } from './core/store.ts';
 import { loadUniverse } from './data/universe.ts';
 import { App } from './core/App.ts';
+import { connectUrlState } from './core/urlState.ts';
 
 /** Handles exposed by the UI layer; mirrored here so main does not hard-depend on it. */
 interface UIHandles {
@@ -49,6 +50,10 @@ async function main(): Promise<void> {
   } catch (err) {
     console.warn('[mcu] UI layer unavailable, running renderer only:', err);
   }
+
+  // Before the app starts, so a ?card= link is already selected on first frame
+  // and the camera flies straight to it rather than snapping afterwards.
+  connectUrlState(universe);
 
   setBoot(0.9, 'Igniting stars');
   const app = new App(canvas, universe, {

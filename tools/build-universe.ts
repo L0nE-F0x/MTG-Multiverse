@@ -126,6 +126,12 @@ function typeMaskFor(typeLine: string, layout: string): number {
   for (const [re, bit] of TYPE_WORD_BITS) {
     if (re.test(lower)) m |= bit;
   }
+  if (layout === 'art_series') {
+    // Secret Lair / set-booster art cards: printed objects with no game
+    // type_line ("Card" / "Card // Card"). They get their own bit and are
+    // never tokens, regardless of what the (non-game) type_line says.
+    return m | TYPE_BIT.artSeries;
+  }
   const isTokenLayout = layout === 'token' || layout === 'double_faced_token' || layout === 'emblem';
   if (isTokenLayout || /^\s*token\b/i.test(typeLine || '')) {
     m |= TYPE_BIT.token;
@@ -160,6 +166,28 @@ function cmcFor(raw: number | null | undefined): number {
   return Math.max(0, Math.min(30, r));
 }
 
+/**
+ * The name to intern for this card. `card.name` is always the English
+ * Oracle name (Scryfall's canonical identity), even for printings that have
+ * no English release. For those, `printed_name` (or per-face printed_name
+ * for multi-faced cards) carries the actual name as printed on the card, in
+ * its own language -- which is what a card with no English printing should
+ * be searchable by. English rows sometimes carry a `printed_name` too (e.g.
+ * Universes Beyond crossover flavor names), but that's a different name for
+ * the same English card, not a translation, so English always keeps
+ * `card.name`.
+ */
+function resolveName(card: RawCard): string {
+  if (card.lang !== 'en') {
+    if (card.printed_name) return card.printed_name;
+    const faces = card.card_faces;
+    if (Array.isArray(faces) && faces.some((f) => f.printed_name)) {
+      return faces.map((f) => f.printed_name ?? f.name ?? '').join(' // ');
+    }
+  }
+  return card.name ?? '';
+}
+
 function priceFor(prices: Record<string, string | null> | undefined | null): number {
   if (!prices) return 0;
   let v = prices.usd != null ? parseFloat(prices.usd) : NaN;
@@ -170,6 +198,8 @@ function priceFor(prices: Record<string, string | null> | undefined | null): num
 }
 
 interface CardFace {
+  name?: string;
+  printed_name?: string;
   colors?: string[];
   image_uris?: Record<string, string>;
   oracle_id?: string;
@@ -180,6 +210,7 @@ interface RawCard {
   id: string;
   oracle_id?: string;
   name: string;
+  printed_name?: string;
   lang: string;
   layout: string;
   released_at?: string;
@@ -289,9 +320,11 @@ async function main(): Promise<void> {
 
   let totalLines = 0;
   let droppedObj = 0;
-  let droppedLayout = 0;
-  let droppedLang = 0;
   let droppedParseErr = 0;
+  // Not dropped -- these two categories are real, distinct cards. Counted
+  // separately purely so the summary stays auditable.
+  let keptArtSeries = 0;
+  let keptForeignOnly = 0;
 
   let minReleaseDay = Number.POSITIVE_INFINITY;
   let maxReleaseDay = 0;
@@ -314,14 +347,8 @@ async function main(): Promise<void> {
       droppedObj++;
       continue;
     }
-    if (card.layout === 'art_series') {
-      droppedLayout++;
-      continue;
-    }
-    if (card.lang !== 'en') {
-      droppedLang++;
-      continue;
-    }
+    if (card.layout === 'art_series') keptArtSeries++;
+    if (card.lang !== 'en') keptForeignOnly++;
 
     if (n >= CAPACITY) {
       throw new Error(`CAPACITY (${CAPACITY}) exceeded at line ${totalLines}; raise it and re-run`);
@@ -335,7 +362,7 @@ async function main(): Promise<void> {
     ids.set(idBuf, i * ID_BYTES);
 
     // nameIdx / artistIdx
-    nameIdxCol[i] = intern(nameMap, names, card.name ?? '');
+    nameIdxCol[i] = intern(nameMap, names, resolveName(card));
     artistIdxCol[i] = intern(artistMap, artists, card.artist ?? '');
 
     // oracleIdx (fallback chain for the handful of reversible_card rows that
@@ -414,9 +441,9 @@ async function main(): Promise<void> {
   }
 
   process.stderr.write(
-    `Read ${totalLines.toLocaleString()} lines: kept ${n.toLocaleString()}, ` +
-      `dropped non-card ${droppedObj}, art_series ${droppedLayout}, non-English ${droppedLang}, ` +
-      `parse errors ${droppedParseErr}\n`,
+    `Read ${totalLines.toLocaleString()} lines: kept ${n.toLocaleString()} ` +
+      `(of which art_series ${keptArtSeries.toLocaleString()}, foreign-only ${keptForeignOnly.toLocaleString()}), ` +
+      `dropped non-card ${droppedObj}, parse errors ${droppedParseErr}\n`,
   );
 
   // --- popularity: rank-based mapping over the *observed* distinct ranks --
@@ -571,6 +598,8 @@ async function main(): Promise<void> {
 
   process.stderr.write('\n--- universe build summary ---\n');
   process.stderr.write(`cards:            ${n.toLocaleString()}\n`);
+  process.stderr.write(`  of which art_series (kept, artSeries bit set): ${keptArtSeries.toLocaleString()}\n`);
+  process.stderr.write(`  of which foreign-only printings (kept):        ${keptForeignOnly.toLocaleString()}\n`);
   process.stderr.write(`unique names:     ${names.length.toLocaleString()}\n`);
   process.stderr.write(`unique artists:   ${artists.length.toLocaleString()}\n`);
   process.stderr.write(`unique sets:      ${sets.length.toLocaleString()}\n`);

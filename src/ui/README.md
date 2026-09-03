@@ -25,12 +25,36 @@ Full-screen boot-sequence overlay.
 - Fades out and unmounts itself once `ready` becomes `true` (or immediately
   if it was already `true` at mount time).
 
-### `hud.ts` — `mountHud(root, universe)`
-Top-left wordmark + live match count, and the bottom-centre layout-mode
-segmented control.
+### `hud.ts` — `mountHud(root, universe, onAbout)`
+Top-left wordmark + live match count, a small "?" About control next to the
+wordmark, and the bottom-centre layout-mode segmented control.
 - Reads: `matchCount`, `layout`.
 - Writes: `layout` (via `store.set('layout', mode)` on click).
 - `universe.count` supplies the fixed "of N stars" denominator.
+- `onAbout` is called on click of the "?" control; `index.ts` wires it to
+  `intro.open()` so the landing overlay is always reachable again.
+
+### `intro.ts` — `mountIntro(root, universe)`
+Landing / introduction overlay: three sections ("What this is", "How to
+read it", "Controls") over a frosted glass panel, with the galaxy still
+visible (and slowly turning) behind it.
+- Reads: `ready` (subscribes via `store.on('ready', ...)`, and also checks
+  `store.state.ready` at mount time in case it is already `true`).
+- Writes: `visual.autoRotate` (`store.patchVisual`) — `true` while open,
+  restored to `false` on close.
+- Opens automatically the first time `ready` flips `true`, unless
+  `localStorage['mcu.introSeen']` is already `'1'` (every localStorage
+  access is wrapped in try/catch — it can throw in some privacy modes).
+  Dismissing by any route (the "Enter the universe" button, a backdrop
+  click, or `Esc`) sets that key so returning visitors skip straight in.
+- Returns `{ open(), destroy() }` on its handle; `open()` is how the HUD's
+  "?" control reopens it later. The overlay's DOM and listeners are created
+  once at mount and only toggled via a CSS class, so open/close/reopen never
+  leaks listeners.
+- `universe.count` supplies the live card count in section 1 (via `fmtInt`).
+- Respects `prefers-reduced-motion` through the shared `.mcu-root` rule in
+  `base.css`; entrance stagger and the dismiss fade/scale both use
+  `var(--mcu-ease)`.
 
 ### `search.ts` — `mountSearch(root, universe)`
 Top-centre search box with a keyboard-navigable results dropdown.
@@ -126,7 +150,7 @@ One file per component, each imported directly by its module
   click-through layer, shared panel/chip/pip/segmented-control chrome, the
   corner-bracket motif, `prefers-reduced-motion` handling.
 - `loading.css`, `hud.css`, `search.css`, `filters.css`, `cardPanel.css`,
-  `tooltip.css`, `settings.css` — one per component above.
+  `tooltip.css`, `settings.css`, `intro.css` — one per component above.
 
 Panels that are both fixed-and-centred *and* CSS-animated (the search bar,
 the layout switcher) use the CSS `translate` property for centring and

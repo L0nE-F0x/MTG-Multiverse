@@ -8,7 +8,9 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "data:fetch": "node tools/fetch-bulk.ts",
-    "data:build": "node --max-old-space-size=6144 tools/build-universe.ts"
+    "data:build": "node --max-old-space-size=6144 tools/build-universe.ts",
+    "test:interaction": "node tools/test-interaction.mjs",
+    "og": "node tools/screenshot.mjs --out public/og.jpg --width 1200 --height 630 --quality 90 --settle 7000 --eval-file tools/og/compose.js"
   },
   "dependencies": {
     "postprocessing": "^6.37.8",

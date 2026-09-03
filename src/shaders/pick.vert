@@ -5,14 +5,16 @@ uniform float uSizeScale;
 uniform float uMinPixels;
 uniform float uPickRadius;
 
-attribute vec3  aPosB;
-attribute float aSize;
-attribute float aVisPrev;
-attribute float aVisNext;
-attribute float aIndex;
+// GLSL3: `position` and the matrices are declared by three; only the custom
+// attributes are ours to declare.
+in vec3  aPosB;
+in float aSize;
+in float aVisPrev;
+in float aVisNext;
+in float aIndex;
 
-varying float vId;
-varying float vVisible;
+out float vId;
+out float vVisible;
 
 void main() {
   vec3 p = mix(position, aPosB, uMorph);

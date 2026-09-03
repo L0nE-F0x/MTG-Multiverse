@@ -115,7 +115,9 @@ export class Universe {
     const hideReprints = f.hideReprints;
     const hideDigital = f.hideDigital;
     const hideTokens = f.hideTokens;
-    const TOKEN = TYPE_BIT.token;
+    // Art cards are printed objects with no game text; they belong with tokens
+    // under the same "things that are not really playable cards" toggle.
+    const NON_GAME = TYPE_BIT.token | TYPE_BIT.artSeries;
 
     // A text query narrows to a name-index set, resolved once up front.
     let nameAllow: Uint8Array | null = null;
@@ -134,7 +136,7 @@ export class Universe {
       if (hideReprints && fl & FLAG_BIT.reprint) { out[i] = 0; continue; }
 
       const tm = typeMask[i];
-      if (hideTokens && tm & TOKEN) { out[i] = 0; continue; }
+      if (hideTokens && tm & NON_GAME) { out[i] = 0; continue; }
       if (typeReq && !(tm & typeReq)) { out[i] = 0; continue; }
 
       const y = year[i];
@@ -195,6 +197,30 @@ export class Universe {
       out[k] = best;
     }
     return out;
+  }
+
+  /**
+   * Index of the card with this Scryfall UUID, or -1.
+   *
+   * A linear scan rather than a lookup table: building a Map of 117k uuid
+   * strings costs several megabytes and this runs at most once per page load,
+   * to resolve a shared link.
+   */
+  indexOfUuid(uuid: string): number {
+    const hex = uuid.replace(/-/g, '').toLowerCase();
+    if (!/^[0-9a-f]{32}$/.test(hex)) return -1;
+    const want = new Uint8Array(ID_BYTES);
+    for (let i = 0; i < ID_BYTES; i++) want[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+
+    const ids = this.col.ids;
+    const first = want[0];
+    outer: for (let c = 0; c < this.count; c++) {
+      const o = c * ID_BYTES;
+      if (ids[o] !== first) continue;
+      for (let i = 1; i < ID_BYTES; i++) if (ids[o + i] !== want[i]) continue outer;
+      return c;
+    }
+    return -1;
   }
 
   /** Every printing of the card at index i, oldest first. */

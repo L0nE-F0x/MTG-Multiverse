@@ -223,7 +223,7 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
   const optionsSection = sectionWrap('Options', [
     el('label', { className: 'mcu-checkbox-row' }, [reprintsCb, document.createTextNode('Hide reprints')]),
     el('label', { className: 'mcu-checkbox-row' }, [digitalCb, document.createTextNode('Hide digital-only')]),
-    el('label', { className: 'mcu-checkbox-row' }, [tokensCb, document.createTextNode('Hide tokens')]),
+    el('label', { className: 'mcu-checkbox-row' }, [tokensCb, document.createTextNode('Hide tokens & art cards')]),
   ]);
 
   // ---- Assembly -------------------------------------------------------------

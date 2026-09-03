@@ -17,6 +17,12 @@
   border-radius: 10px;
   animation: mcu-panel-in 500ms var(--mcu-ease) both;
 }
+.mcu-command-bar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
 .mcu-wordmark {
   font-size: 13px;
   font-weight: 700;
@@ -25,6 +31,29 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+.mcu-about-btn {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--mcu-border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--mcu-text-dim);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: all 180ms var(--mcu-ease);
+}
+.mcu-about-btn:hover {
+  color: var(--mcu-cyan);
+  border-color: var(--mcu-border-strong);
+  box-shadow: 0 0 10px rgba(94, 231, 255, 0.3);
 }
 .mcu-command-count {
   font-size: 10.5px;
@@ -100,6 +129,7 @@
 @media (max-width: 900px) {
   .mcu-command-bar { top: 10px; left: 10px; padding: 8px 12px; }
   .mcu-wordmark { font-size: 11px; }
+  .mcu-about-btn { width: 24px; height: 24px; font-size: 12px; }
   .mcu-layout-desc { display: none; }
   .mcu-layout-btn { padding: 7px 8px; font-size: 9px; }
   .mcu-layout-switcher { bottom: 12px; }

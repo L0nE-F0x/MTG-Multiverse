@@ -8,6 +8,7 @@ import type { Universe } from '../data/universe.ts';
 import { mountCardPanel } from './cardPanel.ts';
 import { mountFilters } from './filters.ts';
 import { mountHud } from './hud.ts';
+import { mountIntro } from './intro.ts';
 import { mountLoading } from './loading.ts';
 import { mountSearch } from './search.ts';
 import { mountSettings } from './settings.ts';
@@ -23,7 +24,8 @@ export function mountUI(root: HTMLElement, universe: Universe): UIHandles {
   root.classList.add('mcu-root');
 
   const loading = mountLoading(root);
-  const hud = mountHud(root, universe);
+  const intro = mountIntro(root, universe);
+  const hud = mountHud(root, universe, () => intro.open());
   const search = mountSearch(root, universe);
   const filters = mountFilters(root, universe);
   const cardPanel = mountCardPanel(root, universe);
@@ -36,6 +38,7 @@ export function mountUI(root: HTMLElement, universe: Universe): UIHandles {
     },
     destroy() {
       loading.destroy();
+      intro.destroy();
       hud.destroy();
       search.destroy();
       filters.destroy();

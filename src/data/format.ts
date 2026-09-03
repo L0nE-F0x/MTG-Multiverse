@@ -10,7 +10,7 @@
  * these columns so we can hold several layouts at once and morph between them.
  */
 
-export const UNIVERSE_FORMAT_VERSION = 3;
+export const UNIVERSE_FORMAT_VERSION = 4;
 
 /** Column names, in the order the pipeline writes them. */
 export type ColumnName =
@@ -98,6 +98,8 @@ export const TYPE_BIT = {
   token: 256,
   legendary: 512,
   basic: 1024,
+  /** Secret Lair / set-booster art cards: printed, but with no game text. */
+  artSeries: 2048,
 } as const;
 export type TypeName = keyof typeof TYPE_BIT;
 
