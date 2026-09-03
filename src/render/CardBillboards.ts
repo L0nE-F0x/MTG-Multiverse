@@ -219,8 +219,19 @@ export class CardBillboards {
 
   /** Bind candidates to slots, keeping cards that are already on screen put. */
   private assign(): void {
+    // Cap each distinct card at one billboard. Popular cards have dozens of
+    // printings clustered by era, so the unfiltered ranking happily fills the
+    // pool with the same art repeated.
+    const oracle = this.universe.col.oracleIdx;
+    const seenOracle = new Set<number>();
     const wanted = new Set<number>();
-    for (let i = 0; i < this.candCount; i++) wanted.add(this.candIdx[i]);
+    for (let i = 0; i < this.candCount; i++) {
+      const card = this.candIdx[i];
+      const o = oracle[card];
+      if (seenOracle.has(o)) continue;
+      seenOracle.add(o);
+      wanted.add(card);
+    }
 
     // Slots showing a card that is still wanted keep it — reassigning would
     // make cards flicker between positions as the ranking shuffles.
@@ -240,7 +251,7 @@ export class CardBillboards {
 
     for (let i = 0; i < this.candCount && free.length > 0; i++) {
       const card = this.candIdx[i];
-      if (held.has(card)) continue;
+      if (!wanted.has(card) || held.has(card)) continue;
       const tex = this.texture(card);
       if (!tex) continue; // still loading; a later tick will pick it up
       const slot = free.pop()!;

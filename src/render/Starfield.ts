@@ -125,7 +125,6 @@ export class Starfield {
     this.points.renderOrder = 10;
   }
 
-  get currentLayout(): LayoutMode { return this.layout; }
   get isMorphing(): boolean { return this.morphing; }
 
   /**

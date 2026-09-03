@@ -14,9 +14,15 @@ Nothing about the layout is decorative. A card's position *is* its data:
 | Star colour | Blended colour identity; gold mixed in with colour count |
 | Halo | Colourless artifacts, which belong to no arm |
 
-Fly in close and the actual card art materialises around you. Hover any star for
-its name, click it to open the card, and the URL updates so the view is
-shareable.
+Fly in close and the actual card art materialises around you; at middle
+distances the most-played cards label themselves, so the landmarks announce
+what you are looking at. Hover any star for its name, click it to open the card,
+and the URL updates so the view is shareable.
+
+**Controls.** Drag to orbit, right/middle/shift-drag to pan, scroll to zoom.
+`WASD` or the arrow keys fly, `Q`/`E` rise and fall, `Shift` moves faster.
+`/` or `Ctrl+K` searches, `R` jumps to a random notable card, `F` reframes,
+`Esc` closes the card panel.
 
 The volumetric nebula is generated from the *same* spiral function the stars are
 placed with, so the gas genuinely follows the arms and is tinted by whichever
@@ -46,6 +52,7 @@ node tools/verify-universe.ts       # asserts the generated data is sane
 node tools/screenshot.mjs --out shot.png   # headless capture, for iterating on visuals
 npm run test:interaction            # drives real mouse/keyboard against the dev server
 npm run og                          # regenerate the social preview image
+node tools/bench.mjs                # frame-rate benchmark across representative views
 ```
 
 `npm run dev` must be running for the last two.
@@ -75,6 +82,8 @@ src/
   shaders/           GLSL, with a shared lib/common.glsl
   core/urlState.ts   ?card= / ?layout= deep links, both directions
   render/CardBillboards.ts  real card art, drawn at the stars when you get close
+  render/StarLabels.ts      names for the most-played cards currently in view
+  render/CoreGlow.ts        the galactic nucleus
   ui/                overlays; imports the store and nothing else
 tools/               offline pipeline + capture harness (Node, run directly)
 ```
@@ -102,7 +111,17 @@ filtering is free and four analytic octaves per step at up to 96 steps is not.
 
 Picking is done on the GPU: the same geometry is redrawn with each index encoded
 as a colour, scissored to the single pixel under the cursor, and read back
-asynchronously so the main thread never stalls.
+asynchronously so the main thread never stalls. The pick pass writes
+disc-relative depth rather than camera depth, so the star nearest the cursor
+wins rather than the one nearest the eye.
+
+Quality adapts automatically over a six-level ladder — the nebula is turned down
+first, and only at its floor does the main render resolution drop, because that
+hurts the stars. It descends proportionally to how far below target the frame
+rate is, so flying into the dense core recovers in a second or two rather than
+twenty. `tools/bench.mjs` measures the result; run it against a static
+`vite preview` build rather than the dev server, since hot reloads invalidate a
+run mid-flight.
 
 ## Data
 

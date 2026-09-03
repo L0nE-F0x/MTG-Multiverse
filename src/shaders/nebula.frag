@@ -20,6 +20,10 @@ layout(location = 0) out vec4 fragColor;
 
 const float R_OUT = 400.0;
 const float H_OUT = 120.0;
+/* Longest stretch of volume any single ray will integrate. Inside the disc the
+   geometric span exceeds 800 units, but transmittance has collapsed long before
+   that, so the tail is paid for and never seen. */
+const float MAX_RAY = 620.0;
 
 float n1(vec3 p) { return texture(uNoise, p).r; }
 
@@ -152,6 +156,8 @@ void main() {
     float tMin = max(max(t0, ty0), 0.0);
     float tMax = min(t1, ty1);
 
+    tMax = min(tMax, tMin + MAX_RAY);
+
     if (tMax > tMin) {
       float steps = uSteps;
       float dt = (tMax - tMin) / steps;
@@ -164,7 +170,7 @@ void main() {
       float transmittance = 1.0;
 
       for (int i = 0; i < 96; i++) {
-        if (float(i) >= steps || transmittance < 0.012) break;
+        if (float(i) >= steps || transmittance < 0.035) break;
         vec3 p = ro + rd * t;
 
         vec3 tint;

@@ -5,6 +5,8 @@ import { Starfield } from '../render/Starfield.ts';
 import { Nebula } from '../render/Nebula.ts';
 import { Picker } from '../render/Picker.ts';
 import { CardBillboards } from '../render/CardBillboards.ts';
+import { StarLabels } from '../render/StarLabels.ts';
+import { CoreGlow } from '../render/CoreGlow.ts';
 import { createPostChain, type PostChain } from '../render/post.ts';
 import type { Universe } from '../data/universe.ts';
 
@@ -12,17 +14,22 @@ const FOV = 55;
 const CLICK_SLOP_PX = 5;
 
 /**
- * Nebula render tiers, cheapest first. The raymarch dominates the frame, so
- * this is the only knob worth turning automatically — the star field itself is
- * one draw call and costs the same at any quality.
+ * Quality ladder, cheapest first.
+ *
+ * The raymarch dominates, so the nebula is turned down first. Only once it is
+ * at its floor does the ladder start reducing the main render resolution —
+ * that hurts the stars, which are the whole point, so it is the last resort
+ * rather than the first.
  */
-const NEBULA_TIERS = [
-  { scale: 0.22, steps: 24 },
-  { scale: 0.32, steps: 34 },
-  { scale: 0.42, steps: 44 },
-  { scale: 0.5, steps: 52 },
+const QUALITY_LEVELS = [
+  { nebulaScale: 0.18, steps: 20, renderScale: 0.70 },
+  { nebulaScale: 0.22, steps: 24, renderScale: 0.82 },
+  { nebulaScale: 0.26, steps: 28, renderScale: 0.92 },
+  { nebulaScale: 0.32, steps: 34, renderScale: 1.0 },
+  { nebulaScale: 0.42, steps: 44, renderScale: 1.0 },
+  { nebulaScale: 0.50, steps: 52, renderScale: 1.0 },
 ];
-const TOP_TIER = NEBULA_TIERS.length - 1;
+const TOP_TIER = QUALITY_LEVELS.length - 1;
 
 export interface AppOptions {
   /** Screen position of the hovered star, for the tooltip. */
@@ -39,6 +46,8 @@ export class App {
   private readonly nebula: Nebula;
   private readonly picker: Picker;
   private readonly billboards: CardBillboards;
+  private readonly labels: StarLabels;
+  private readonly coreGlow = new CoreGlow();
   private readonly post: PostChain;
   private readonly universe: Universe;
   private readonly canvas: HTMLCanvasElement;
@@ -56,6 +65,7 @@ export class App {
   private fpsAccum = 0;
   private filterQueued = false;
   private tier = TOP_TIER;
+  private renderScale = 1;
   private tierCooldown = 0;
   private disposers: (() => void)[] = [];
 
@@ -84,10 +94,13 @@ export class App {
     this.picker = new Picker(this.starfield);
 
     this.billboards = new CardBillboards(universe, this.starfield, this.mask);
+    this.labels = new StarLabels(universe, this.starfield, this.mask);
 
     this.scene.add(this.nebula.compositeMesh);
     this.scene.add(this.starfield.points);
     this.scene.add(this.billboards.group);
+    this.scene.add(this.labels.group);
+    this.scene.add(this.coreGlow.group);
 
     this.post = createPostChain(this.renderer, this.scene, this.camera);
 
@@ -101,6 +114,9 @@ export class App {
     this.applyVisual(store.state.visual);
     this.applyFilter();
   }
+
+  /** Current nebula quality tier, 0 (cheapest) to 3. Diagnostics only. */
+  get qualityTier(): number { return this.tier; }
 
   start(): void {
     if (this.running) return;
@@ -152,7 +168,16 @@ export class App {
     });
 
     add<KeyboardEvent>(window, 'keydown', (e) => {
-      if (e.key === 'Escape') store.set('selected', -1);
+      if (e.key === 'Escape') { store.set('selected', -1); return; }
+
+      // Never steal keys from a text field.
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      const key = e.key.toLowerCase();
+      if (key === 'r') { e.preventDefault(); this.selectRandomCard(); }
+      else if (key === 'f' || key === 'home') { e.preventDefault(); this.resetView(); }
     });
 
     add<Event>(window, 'resize', () => this.resize());
@@ -182,6 +207,38 @@ export class App {
     );
   }
 
+  /** Frame the whole current layout again, without changing the heading. */
+  resetView(): void {
+    store.set('selected', -1);
+    this.rig.frame(this.starfield.frameDistance());
+    this.rig.setPhi(this.starfield.framePhi());
+  }
+
+  /**
+   * Jump to a random card, biased toward ones worth arriving at.
+   *
+   * A uniform pick over 117k lands on an obscure reprint almost every time,
+   * which makes the feature feel broken rather than serendipitous. Sampling
+   * from cards that pass the current filter and weighting by popularity keeps
+   * it surprising but rewarding.
+   */
+  private selectRandomCard(): void {
+    const pop = this.universe.col.popularity;
+    const n = this.universe.count;
+    let best = -1;
+    let bestScore = -1;
+
+    // Reservoir of random tries rather than building a weighted table: this
+    // runs on a keypress, so a handful of samples is cheaper and good enough.
+    for (let tries = 0; tries < 64; tries++) {
+      const i = (Math.random() * n) | 0;
+      if (this.mask[i] === 0) continue;
+      const score = (pop[i] / 65535) * Math.random();
+      if (score > bestScore) { bestScore = score; best = i; }
+    }
+    if (best >= 0) store.set('selected', best);
+  }
+
   private applyLayout(mode: LayoutMode): void {
     this.starfield.setLayout(mode);
     // Reframe only if the user is looking at the whole thing; if they are down
@@ -199,10 +256,15 @@ export class App {
    * ambient haze rather than sitting there as a disc the stars have left.
    */
   private applyNebulaDensity(): void {
-    if (!store.state.visual.showNebula) { this.nebula.setDensity(0); return; }
+    if (!store.state.visual.showNebula) {
+      this.nebula.setDensity(0);
+      this.coreGlow.setStrength(0);
+      return;
+    }
     const mode = store.state.layout;
     const strength = mode === 'galaxy' ? 1 : mode === 'price' ? 0.8 : 0.09;
     this.nebula.setDensity(strength);
+    this.coreGlow.setStrength(mode === 'galaxy' ? 1 : mode === 'price' ? 0.55 : 0);
   }
 
   private applyFilter(): void {
@@ -222,6 +284,7 @@ export class App {
     this.nebula.setIntensity(v.nebula);
     this.applyNebulaDensity();
     this.rig.autoRotate = v.autoRotate;
+    this.labels.setEnabled(v.showLabels);
   }
 
   private applySelection(i: number): void {
@@ -236,7 +299,7 @@ export class App {
   private resize(): void {
     const cssW = Math.max(1, this.canvas.clientWidth || window.innerWidth);
     const cssH = Math.max(1, this.canvas.clientHeight || window.innerHeight);
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2) * this.renderScale;
 
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(cssW, cssH, false);
@@ -262,6 +325,8 @@ export class App {
     this.billboards.update(
       dt, this.camera, this.rig.distance, store.state.hovered, store.state.selected,
     );
+    this.labels.update(dt, this.camera, this.rig.distance);
+    this.coreGlow.update(dt);
 
     this.nebula.render(this.renderer, this.camera, time);
     this.post.composer.render(dt);
@@ -326,16 +391,32 @@ export class App {
     if (this.starfield.isMorphing) return;
 
     if (fps < 38 && this.tier > 0) {
-      this.tier--;
-      this.tierCooldown = 4;
+      // Drop proportionally to the shortfall. Stepping one level at a time with
+      // a long cooldown meant that flying into the dense core — the single
+      // heaviest thing you can do — took the better part of twenty seconds to
+      // recover from, which is exactly when it is most noticeable.
+      const deficit = 38 - fps;
+      const steps = deficit > 16 ? 3 : deficit > 8 ? 2 : 1;
+      this.tier = Math.max(0, this.tier - steps);
+      this.tierCooldown = 1.6;
     } else if (fps > 58 && this.tier < TOP_TIER) {
+      // Climbing back up stays deliberate, so a machine sitting near the
+      // boundary settles instead of oscillating between two levels.
       this.tier++;
       this.tierCooldown = 9;
     } else {
       return;
     }
-    const t = NEBULA_TIERS[this.tier];
-    this.nebula.setQuality(t.scale, t.steps);
+    this.applyQuality();
+  }
+
+  private applyQuality(): void {
+    const level = QUALITY_LEVELS[this.tier];
+    this.nebula.setQuality(level.nebulaScale, level.steps);
+    if (level.renderScale !== this.renderScale) {
+      this.renderScale = level.renderScale;
+      this.resize();
+    }
   }
 
   dispose(): void {
@@ -347,6 +428,8 @@ export class App {
     this.nebula.dispose();
     this.picker.dispose();
     this.billboards.dispose();
+    this.labels.dispose();
+    this.coreGlow.dispose();
     this.post.dispose();
     this.renderer.dispose();
   }

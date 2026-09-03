@@ -105,6 +105,15 @@ years were dense; and concentric rings keyed to *day of year* stayed mostly
 empty, because Magic ships in four to six bursts a year rather than continuously.
 Ranking cards within their year fills the ring while staying monotone in date.
 
+## Popularity is per printing, not per card
+
+`popularity` comes from EDHREC rank, which is a property of the *card*, so every
+one of Sol Ring's ~100 printings carries the same top-tier score. Anything that
+ranks by popularity and then takes the top N will fill its entire budget with
+one card unless it deduplicates on `oracleIdx`. Both `StarLabels` and
+`CardBillboards` do; the candidate buffers are also sized far larger than the
+final count for the same reason, since deduplication happens after scoring.
+
 ## Testing
 
 `npm run test:interaction` drives real mouse and keyboard input through Chrome

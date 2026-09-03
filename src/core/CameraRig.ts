@@ -9,6 +9,21 @@ import * as THREE from 'three';
  * exponential so the smoothing is identical at 30fps and 240fps.
  */
 
+const NAV_KEYS = new Set([
+  'w', 'a', 's', 'd', 'q', 'e', 'shift',
+  'arrowup', 'arrowdown', 'arrowleft', 'arrowright',
+  '=', '+', '-', '_',
+]);
+
+/** True when focus is in a text field, so navigation keys must be left alone. */
+function isTyping(): boolean {
+  const el = document.activeElement;
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' ||
+    (el as HTMLElement).isContentEditable === true;
+}
+
 const EPS = 1e-5;
 const MIN_PHI = 0.02;
 const MAX_PHI = Math.PI - 0.02;
@@ -45,6 +60,7 @@ export class CameraRig {
   private pointers = new Map<number, { x: number; y: number }>();
   private pinchDistance = 0;
   private idleSince = performance.now();
+  private readonly keys = new Set<string>();
   private disposers: (() => void)[] = [];
 
   constructor(camera: THREE.PerspectiveCamera, element: HTMLElement) {
@@ -131,6 +147,53 @@ export class CameraRig {
 
     on('contextmenu', (e) => e.preventDefault());
     on('dblclick', () => this.poke());
+
+    // Keyboard nav is bound to the window, not the canvas, so it works without
+    // the user having to click the background first.
+    const keyDown = (e: KeyboardEvent) => {
+      if (isTyping()) return;
+      const k = e.key.toLowerCase();
+      if (!NAV_KEYS.has(k)) return;
+      e.preventDefault();
+      this.keys.add(k);
+      this.poke();
+    };
+    const keyUp = (e: KeyboardEvent) => this.keys.delete(e.key.toLowerCase());
+    const blur = () => this.keys.clear();
+    window.addEventListener('keydown', keyDown);
+    window.addEventListener('keyup', keyUp);
+    window.addEventListener('blur', blur);
+    this.disposers.push(() => {
+      window.removeEventListener('keydown', keyDown);
+      window.removeEventListener('keyup', keyUp);
+      window.removeEventListener('blur', blur);
+    });
+  }
+
+  /**
+   * Apply held navigation keys. Pan speed scales with orbit distance for the
+   * same reason drag-panning does: a fixed speed is unusably slow at the rim
+   * and uncontrollably fast in the core.
+   */
+  private applyKeys(dt: number): void {
+    if (this.keys.size === 0) return;
+    const fast = this.keys.has('shift') ? 2.6 : 1;
+    const pan = this.radius * 0.85 * dt * fast;
+
+    const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrix, 0);
+    const up = new THREE.Vector3(0, 1, 0);
+    const forward = new THREE.Vector3().crossVectors(up, right).normalize();
+
+    const k = this.keys;
+    if (k.has('a') || k.has('arrowleft')) this.goalTarget.addScaledVector(right, -pan);
+    if (k.has('d') || k.has('arrowright')) this.goalTarget.addScaledVector(right, pan);
+    if (k.has('w') || k.has('arrowup')) this.goalTarget.addScaledVector(forward, pan);
+    if (k.has('s') || k.has('arrowdown')) this.goalTarget.addScaledVector(forward, -pan);
+    if (k.has('q')) this.goalTarget.addScaledVector(up, -pan);
+    if (k.has('e')) this.goalTarget.addScaledVector(up, pan);
+    if (k.has('=') || k.has('+')) this.dolly(Math.exp(-dt * 1.6));
+    if (k.has('-') || k.has('_')) this.dolly(Math.exp(dt * 1.6));
+    this.poke();
   }
 
   private currentPinch(): number {
@@ -179,6 +242,7 @@ export class CameraRig {
   }
 
   update(dt: number): void {
+    this.applyKeys(dt);
     if (this.autoRotate && !this.dragging && this.idleSeconds > 2.5) {
       this.goalTheta += this.autoRotateSpeed * dt;
     }

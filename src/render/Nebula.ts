@@ -86,8 +86,18 @@ export class Nebula {
   setSize(width: number, height: number): void {
     this.width = width;
     this.height = height;
-    const w = Math.max(1, Math.round(width * this.scale));
-    const h = Math.max(1, Math.round(height * this.scale));
+
+    // Clamp to an absolute pixel budget as well as the relative scale. On a
+    // retina panel the drawing buffer is already 4x a 1x display, and the
+    // volume is low-frequency enough that resolving it at that size buys
+    // nothing but cost.
+    let scale = this.scale;
+    const budget = 1_150_000;
+    const pixels = width * height * scale * scale;
+    if (pixels > budget) scale *= Math.sqrt(budget / pixels);
+
+    const w = Math.max(1, Math.round(width * scale));
+    const h = Math.max(1, Math.round(height * scale));
     this.target.setSize(w, h);
     this.marchMaterial.uniforms.uResolution.value.set(w, h);
   }
@@ -103,11 +113,6 @@ export class Nebula {
 
   /** Density is eased rather than set, so layout changes do not pop the gas. */
   setDensity(v: number): void { this.targetDensity = v; }
-  setDensityImmediate(v: number): void {
-    this.targetDensity = v;
-    this.marchMaterial.uniforms.uDensity.value = v;
-  }
-
   update(dt: number): void {
     const u = this.marchMaterial.uniforms.uDensity;
     const k = 1 - Math.exp(-dt * 2.2);
