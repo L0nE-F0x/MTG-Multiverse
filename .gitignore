@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+
+# The raw Scryfall dump (75 MB) is an input, not an artefact — regenerate it
+# with `npm run data:fetch`.
+data/raw/
+
+# NOTE: public/data/ is deliberately NOT ignored. It holds the generated
+# universe.bin (5.3 MB) and universe-meta.json (816 KB), and the deployed site
+# is useless without them: Vite copies public/ into dist/ at build time, so a
+# fresh CI clone that lacks them produces a site that boots straight to
+# "universe-meta.json missing". Building them in CI instead would mean pulling
+# 75 MB from Scryfall and streaming 450 MB through Node on every deploy, so the
+# 6 MB in git is the better trade. Regenerate with `npm run data:build`.

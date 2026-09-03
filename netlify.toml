@@ -1,0 +1,11 @@
+# Netlify deploy config.
+#
+# The data files are committed (see .gitignore), so the build is just a
+# typecheck plus a Vite bundle — no Scryfall fetch at deploy time.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"

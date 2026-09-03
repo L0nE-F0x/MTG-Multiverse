@@ -1,0 +1,242 @@
+/* Right-edge card detail panel. */
+
+.mcu-card-panel {
+  position: fixed;
+  top: 20px;
+  bottom: 20px;
+  right: 20px;
+  width: 340px;
+  z-index: 22;
+  padding: 18px;
+  overflow-y: auto;
+  pointer-events: auto;
+  transform: translateX(calc(100% + 40px));
+  opacity: 0;
+  transition: transform 460ms var(--mcu-ease), opacity 380ms var(--mcu-ease);
+}
+.mcu-card-panel--open {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.mcu-card-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--mcu-border);
+  color: var(--mcu-text-dim);
+  cursor: pointer;
+  font-size: 11px;
+  transition: all 180ms var(--mcu-ease);
+}
+.mcu-card-close:hover {
+  color: var(--mcu-danger);
+  border-color: var(--mcu-danger);
+}
+
+.mcu-card-image-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 63 / 88;
+  border-radius: 10px;
+  margin: 8px 0 16px;
+  perspective: 800px;
+}
+.mcu-card-image-frame::before {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(circle, var(--glow-1, #5ee7ff) 0%, var(--glow-2, #a56bff) 45%, transparent 72%);
+  filter: blur(28px);
+  opacity: 0.45;
+  z-index: 0;
+}
+.mcu-card-image,
+.mcu-card-image-shimmer,
+.mcu-card-image-fallback {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  z-index: 1;
+}
+.mcu-card-image {
+  object-fit: cover;
+  transition: opacity 320ms ease, transform 120ms ease-out;
+  transform-style: preserve-3d;
+}
+.mcu-card-image-shimmer {
+  background: linear-gradient(110deg, rgba(255, 255, 255, 0.02) 8%, rgba(255, 255, 255, 0.09) 18%, rgba(255, 255, 255, 0.02) 33%);
+  background-size: 200% 100%;
+  animation: mcu-shimmer 1.4s linear infinite;
+}
+@keyframes mcu-shimmer {
+  to { background-position-x: -200%; }
+}
+.mcu-card-image-fallback {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed var(--mcu-border);
+  color: var(--mcu-text-faint);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-align: center;
+  padding: 12px;
+}
+
+.mcu-card-name {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.mcu-card-set-line {
+  font-size: 11px;
+  color: var(--mcu-text-dim);
+  margin-top: 2px;
+}
+.mcu-card-rarity {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  margin-top: 6px;
+}
+.mcu-card-rarity--common { color: #9098a8; }
+.mcu-card-rarity--uncommon { color: #b0b0b0; }
+.mcu-card-rarity--rare { color: #d4af37; }
+.mcu-card-rarity--mythic { color: #e35b1c; }
+.mcu-card-rarity--special { color: #a56bff; }
+.mcu-card-rarity--bonus { color: #5ee7ff; }
+
+.mcu-card-artist {
+  font-size: 10.5px;
+  color: var(--mcu-text-faint);
+  font-style: italic;
+  margin-top: 4px;
+}
+.mcu-card-pips {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+.mcu-card-colorless {
+  font-size: 10px;
+  color: var(--mcu-text-faint);
+  letter-spacing: 0.06em;
+}
+.mcu-card-price {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mcu-cyan);
+}
+
+.mcu-legality-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 10px;
+}
+.mcu-legality-badge {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: rgba(94, 231, 255, 0.1);
+  border: 1px solid rgba(94, 231, 255, 0.25);
+  color: var(--mcu-cyan);
+}
+
+.mcu-card-oracle {
+  margin-top: 12px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--mcu-text-dim);
+}
+.mcu-card-oracle--loading::after {
+  content: 'Fetching oracle text…';
+  color: var(--mcu-text-faint);
+  font-style: italic;
+}
+.mcu-card-typeline {
+  font-weight: 600;
+  color: var(--mcu-text);
+  margin-bottom: 4px;
+}
+.mcu-card-manacost {
+  color: var(--mcu-text-faint);
+  font-size: 10.5px;
+  margin-bottom: 6px;
+}
+.mcu-card-oracletext {
+  white-space: pre-line;
+  margin-bottom: 8px;
+}
+.mcu-card-flavortext {
+  font-style: italic;
+  color: var(--mcu-text-faint);
+}
+
+.mcu-panel-heading {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 10px;
+  color: var(--mcu-text-dim);
+  margin: 16px 0 8px;
+}
+.mcu-printings-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.mcu-printing-chip {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--mcu-border);
+  border-radius: 5px;
+  color: var(--mcu-text-dim);
+  font-size: 10px;
+  padding: 4px 7px;
+  cursor: pointer;
+  transition: all 160ms var(--mcu-ease);
+}
+.mcu-printing-chip:hover {
+  color: var(--mcu-text);
+  border-color: var(--mcu-border-strong);
+}
+.mcu-printing-chip--current {
+  color: #06111a;
+  background: linear-gradient(135deg, var(--mcu-cyan), var(--mcu-violet));
+  border-color: transparent;
+}
+
+.mcu-card-link {
+  display: inline-block;
+  margin-top: 16px;
+  font-size: 11px;
+  color: var(--mcu-cyan);
+  text-decoration: none;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid rgba(94, 231, 255, 0.3);
+}
+.mcu-card-link:hover {
+  border-color: var(--mcu-cyan);
+}
+
+@media (max-width: 900px) {
+  .mcu-card-panel {
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 92vw;
+    max-width: 380px;
+    border-radius: 12px 0 0 12px;
+  }
+}

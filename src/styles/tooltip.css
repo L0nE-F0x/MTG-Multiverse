@@ -1,0 +1,39 @@
+/* Hover tooltip. Purely transform-positioned, never touches layout. */
+
+.mcu-tooltip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 40;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--mcu-panel-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--mcu-border);
+  border-radius: 8px;
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 140ms ease;
+  will-change: transform;
+}
+.mcu-tooltip--visible {
+  opacity: 1;
+}
+.mcu-tooltip-name {
+  color: var(--mcu-text);
+  font-weight: 600;
+}
+.mcu-tooltip-set {
+  color: var(--mcu-cyan);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 5px;
+  background: rgba(94, 231, 255, 0.1);
+  border-radius: 4px;
+}

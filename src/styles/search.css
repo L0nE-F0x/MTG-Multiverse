@@ -1,0 +1,114 @@
+/* Prominent top-centre search bar + results dropdown. */
+
+.mcu-search {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  translate: -50% 0;
+  width: min(480px, 90vw);
+  pointer-events: auto;
+  z-index: 30;
+  animation: mcu-panel-in 500ms var(--mcu-ease) both;
+}
+
+.mcu-search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  translate: 0 -50%;
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid var(--mcu-text-dim);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.mcu-search-icon::after {
+  content: '';
+  position: absolute;
+  width: 5px;
+  height: 1.5px;
+  background: var(--mcu-text-dim);
+  rotate: 45deg;
+  right: -5px;
+  bottom: -1px;
+}
+
+.mcu-search-input {
+  width: 100%;
+  background: var(--mcu-panel-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--mcu-border);
+  border-radius: 10px;
+  padding: 12px 16px 12px 36px;
+  font-size: 13px;
+  color: var(--mcu-text);
+  outline: none;
+  transition: all 200ms var(--mcu-ease);
+}
+.mcu-search-input::placeholder {
+  color: var(--mcu-text-faint);
+}
+.mcu-search-input:focus {
+  border-color: var(--mcu-cyan);
+  box-shadow: 0 0 0 3px rgba(94, 231, 255, 0.12), 0 0 24px rgba(94, 231, 255, 0.2);
+}
+
+.mcu-search-results {
+  margin-top: 8px;
+  max-height: 0;
+  overflow: hidden auto;
+  background: var(--mcu-panel-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 10px;
+  border: 1px solid transparent;
+  transition: max-height 260ms var(--mcu-ease), border-color 200ms var(--mcu-ease);
+}
+.mcu-search--open .mcu-search-results {
+  max-height: 360px;
+  border-color: var(--mcu-border);
+}
+
+.mcu-search-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  cursor: pointer;
+  font-size: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.mcu-search-row:last-child { border-bottom: none; }
+.mcu-search-row:hover,
+.mcu-search-row--active {
+  background: rgba(94, 231, 255, 0.08);
+}
+.mcu-search-name {
+  color: var(--mcu-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mcu-search-set {
+  color: var(--mcu-cyan);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+.mcu-search-year {
+  color: var(--mcu-text-faint);
+  font-size: 10.5px;
+}
+.mcu-search-pips {
+  display: flex;
+  gap: 2px;
+}
+.mcu-search-pips .mcu-pip {
+  width: 8px;
+  height: 8px;
+}
+
+@media (max-width: 900px) {
+  .mcu-search { top: 66px; width: 92vw; }
+}
