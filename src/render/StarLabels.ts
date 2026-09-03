@@ -32,6 +32,14 @@ interface Slot {
   texture: THREE.CanvasTexture;
   ctx: CanvasRenderingContext2D;
   card: number;
+  /**
+   * Whether the latest selection still wants this card. update() must consult
+   * this rather than deciding from `card` alone: it runs after assign() in the
+   * same tick, and recomputing opacity from scratch was overwriting the
+   * fade-out assign() had just requested — so slots never released and the
+   * label set froze after the first fourteen.
+   */
+  wanted: boolean;
   opacity: number;
   targetOpacity: number;
 }
@@ -92,7 +100,9 @@ export class StarLabels {
       sprite.center.set(0.5, 0);  // anchor below the star, growing upward
       this.group.add(sprite);
 
-      this.slots.push({ sprite, material, texture, ctx, card: -1, opacity: 0, targetOpacity: 0 });
+      this.slots.push({
+        sprite, material, texture, ctx, card: -1, wanted: false, opacity: 0, targetOpacity: 0,
+      });
       // Lift the label clear of the star's own glow.
       sprite.center.set(0.5, -0.22);
     }
@@ -120,13 +130,11 @@ export class StarLabels {
     }
 
     for (const slot of this.slots) {
-      if (slot.card >= 0 && active) {
+      if (slot.card >= 0) {
         this.starfield.positionOf(slot.card, this.tmp);
         slot.sprite.position.copy(this.tmp);
-        slot.targetOpacity = 1;
-      } else {
-        slot.targetOpacity = 0;
       }
+      slot.targetOpacity = slot.card >= 0 && active && slot.wanted ? 1 : 0;
 
       const k = 1 - Math.exp(-dt / (FADE_SECONDS / 4));
       slot.opacity += (slot.targetOpacity - slot.opacity) * k;
@@ -137,6 +145,7 @@ export class StarLabels {
 
       if (slot.opacity <= 0.006 && slot.targetOpacity === 0 && slot.card >= 0) {
         slot.card = -1;
+        slot.wanted = false;
       }
     }
   }
@@ -195,7 +204,7 @@ export class StarLabels {
     // A label sprite is LABEL_HEIGHT * (TEX_W/TEX_H) * P00 wide in NDC, which
     // works out just over 0.21 at the default field of view — the previous
     // 0.20 threshold let neighbours overlap by a hair.
-    const minDx = 0.25;
+    const minDx = 0.28;
     const minDy = 0.062;
 
     // One label per distinct card. Sol Ring has around a hundred printings,
@@ -210,7 +219,9 @@ export class StarLabels {
       if (this.seenOracle.has(o)) continue;
       this.starfield.positionOf(i, this.tmp).project(camera);
       if (this.tmp.z > 1) continue;
-      if (Math.abs(this.tmp.x) > 1.05 || Math.abs(this.tmp.y) > 1.05) continue;
+      // Keep clear of the frame edge: a label centred at the boundary extends
+      // past it and reads as clipped text overlapping its neighbour.
+      if (Math.abs(this.tmp.x) > 0.94 || Math.abs(this.tmp.y) > 0.94) continue;
 
       let clashes = false;
       for (const r of rects) {
@@ -234,10 +245,13 @@ export class StarLabels {
     const wanted = new Set<number>();
     for (let i = 0; i < this.candCount; i++) wanted.add(this.candIdx[i]);
 
+    // A slot already showing a wanted card keeps it — and is revived if it had
+    // begun fading, which is what stops the same name appearing twice while one
+    // copy fades out and another fades in.
     const held = new Set<number>();
     for (const slot of this.slots) {
-      if (slot.card >= 0 && wanted.has(slot.card)) held.add(slot.card);
-      else if (slot.card >= 0) slot.targetOpacity = 0;
+      slot.wanted = slot.card >= 0 && wanted.has(slot.card);
+      if (slot.wanted) held.add(slot.card);
     }
 
     const free = this.slots.filter((s) => s.card < 0);
@@ -246,6 +260,7 @@ export class StarLabels {
       if (held.has(card)) continue;
       const slot = free.pop()!;
       slot.card = card;
+      slot.wanted = true;
       slot.opacity = 0;
       this.draw(slot, card);
       held.add(card);

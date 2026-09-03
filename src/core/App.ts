@@ -107,10 +107,15 @@ export class App {
     this.bindEvents();
     this.bindStore();
     this.resize();
-    // Frame after resize so the starfield knows the real field of view. The rig
-    // starts wider than this and eases in, which reads as a deliberate arrival.
-    this.rig.frame(this.starfield.frameDistance());
+
+    // Cinematic arrival: start far enough out that the galaxy is a distant
+    // smudge, then ease in. The low seeded damping relaxes back to normal over
+    // the next second, so the approach starts slow and gathers pace instead of
+    // sliding in at a constant rate.
+    const framed = this.starfield.frameDistance();
     this.rig.setPhi(this.starfield.framePhi());
+    this.rig.setRadius(framed * 3.4);
+    this.rig.flyTo(new THREE.Vector3(0, 0, 0), framed, 0.62);
     this.applyVisual(store.state.visual);
     this.applyFilter();
   }
@@ -293,7 +298,7 @@ export class App {
     this.starfield.positionOf(i, this.tmpVec);
     // Always close the distance on select, so picking a search result on the
     // far rim actually takes you there rather than nudging the pivot.
-    this.rig.flyTo(this.tmpVec, Math.min(this.rig.distance, 120));
+    this.rig.flyTo(this.tmpVec, Math.min(this.rig.distance, 120), 2.6);
   }
 
   private resize(): void {

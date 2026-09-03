@@ -31,6 +31,8 @@ interface Slot {
   sprite: THREE.Sprite;
   material: THREE.SpriteMaterial;
   card: number;
+  /** Whether the latest selection still wants this card. See StarLabels. */
+  wanted: boolean;
   /** 0..1, eased toward `targetOpacity`. */
   opacity: number;
   targetOpacity: number;
@@ -79,7 +81,7 @@ export class CardBillboards {
       sprite.visible = false;
       sprite.renderOrder = 20; // above the additive starfield
       this.group.add(sprite);
-      this.slots.push({ sprite, material, card: -1, opacity: 0, targetOpacity: 0 });
+      this.slots.push({ sprite, material, card: -1, wanted: false, opacity: 0, targetOpacity: 0 });
     }
     this.group.renderOrder = 20;
   }
@@ -113,7 +115,7 @@ export class CardBillboards {
     const fadeStart = radius * 0.62;
 
     for (const slot of this.slots) {
-      if (slot.card >= 0 && active) {
+      if (slot.card >= 0 && active && slot.wanted) {
         this.starfield.positionOf(slot.card, this.tmp);
         slot.sprite.position.copy(this.tmp);
         const d = this.tmp.distanceTo(this.camPos);
@@ -137,6 +139,7 @@ export class CardBillboards {
       // Release the slot once it has fully faded, so it can take a new card.
       if (slot.opacity <= 0.004 && slot.targetOpacity === 0 && slot.card >= 0) {
         slot.card = -1;
+        slot.wanted = false;
         slot.material.map = null;
       }
     }
@@ -237,8 +240,8 @@ export class CardBillboards {
     // make cards flicker between positions as the ranking shuffles.
     const held = new Set<number>();
     for (const slot of this.slots) {
-      if (slot.card >= 0 && wanted.has(slot.card)) held.add(slot.card);
-      else if (slot.card >= 0) slot.targetOpacity = 0;
+      slot.wanted = slot.card >= 0 && wanted.has(slot.card);
+      if (slot.wanted) held.add(slot.card);
     }
 
     // Free slots are collected up front rather than re-scanned per candidate.
@@ -256,6 +259,7 @@ export class CardBillboards {
       if (!tex) continue; // still loading; a later tick will pick it up
       const slot = free.pop()!;
       slot.card = card;
+      slot.wanted = true;
       slot.opacity = 0;
       slot.material.map = tex;
       slot.material.needsUpdate = true;

@@ -217,13 +217,25 @@ export class CameraRig {
     this.goalTarget.addScaledVector(up, dy * scale);
   }
 
-  /** Move the orbit centre to `point` and settle at `distance`. */
-  flyTo(point: THREE.Vector3, distance: number, snappy = false): void {
+  /**
+   * Move the orbit centre to `point` and settle at `distance`.
+   *
+   * `damping` seeds the spring rate; it relaxes back to the normal value over
+   * the next second or so, which is what gives a flight its ease-in. Lower is
+   * slower and more cinematic.
+   */
+  flyTo(point: THREE.Vector3, distance: number, damping = 2.6): void {
     this.goalTarget.copy(point);
     this.goalRadius = clamp(distance, this.minRadius, this.maxRadius);
-    this.damping = snappy ? 9 : 2.6;
+    this.damping = damping;
     this.goalDamping = 6.5;
     this.poke();
+  }
+
+  /** Jump the orbit radius without animating — used to set up an approach. */
+  setRadius(radius: number): void {
+    this.radius = clamp(radius, this.minRadius, this.maxRadius);
+    this.applyImmediate();
   }
 
   /** Reframe the whole scene without changing viewing angle. */
