@@ -21,7 +21,7 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
    | | |
    |---|---|
-   | Latest | `2b1168c` *Close the phone-layout overlap, pin capture quality, refresh the social card* |
+   | Latest | `d033f38` *Thread a selected card's printings through the eras that reprinted it* |
    | Branch | `main` == `origin/main`, working tree clean |
    | Remote | https://github.com/L0nE-F0x/MTG-Multiverse |
 
@@ -34,7 +34,22 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
    The picker flake is **gone**. Three consecutive clean suite runs since
    the stall-abandon fix; the previous session could not get two in a row.
 
-   ### What shipped this pass
+   ### What shipped this pass (newest first)
+
+   - **Printing thread.** Selecting a card draws a line through its
+     printings in release order. Because angle is colour identity and
+     radius is date, that runs outward from the core — Sol Ring is a
+     thread from Alpha to the rim.
+   - **Halo angle is now per card, not per printing** (`layouts.ts`).
+     This was needed to make the thread work at all: colourless cards
+     have no arm, so Sol Ring's 133 printings were scattered around the
+     whole circle by a hash of the row index and the thread was a
+     scribble. It is also simply more honest. Verified no spoke artefacts
+     against the plain galaxy.
+   - The thread only draws in layouts where radius encodes time (galaxy,
+     price, timeline). Elsewhere it would be a scribble again.
+
+   ### Earlier in this pass
 
    - **Phone overlap closed.** The card panel covered the filters tab at
      390px (panel reached x=37, tab occupies 10..54). Both edges are now
@@ -70,9 +85,11 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 ### Ideas not yet done
 
-- Constellation lines linking a selected card to its other printings
-  across the galaxy. Sketched, never built; risk is visual clutter for a
-  card with 100 printings.
+- Fat lines for the printing thread. WebGL ignores `linewidth`, so it is
+  a 1px additive line and washes out where it crosses a bright arm.
+  `Line2`/`LineMaterial` from three's examples would fix it at the cost of
+  extra geometry. The current subtlety is arguably right for an
+  annotation, so this is a judgement call, not a defect.
 - The trail/motion-blur toggle is off by default and decays fast because
   anything stronger ghosts the star labels illegibly.
 
