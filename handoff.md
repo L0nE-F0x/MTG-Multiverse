@@ -13,25 +13,26 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 # ▶ START HERE — next session
 
-0. **2026-09-04, PWA + tour.** Installable standalone app, ApexForge credit
-   on the title, Instructions replaced by a guided tour.
+0. **2026-09-04, wrapped.** Owner is tinkering on the live site and will
+   report back. Do not start autonomous polish. Wait for their notes.
 
    ### Git
 
    | | |
    |---|---|
-   | Latest | this commit |
-   | Branch | `main` |
+   | Latest | `309a714` *Make Aetherfield installable and replace instructions with a tour* |
+   | Branch | `main` == `origin/main`, working tree clean |
    | Remote | https://github.com/L0nE-F0x/MTG-Multiverse |
+   | Live | https://mtg-multiverse.netlify.app |
 
    CSS class prefix stays `mcu-`. Brand copy lives in `src/ui/brand.ts`.
 
    ### State
 
    `npx tsc --noEmit` · `npx tsc -p tsconfig.tools.json --noEmit` ·
-   `npm run test:interaction` → **37/37**.
+   `npm run test:interaction` → **36/36**.
 
-   `npm run og` regenerated `public/og.jpg` as AETHERFIELD.
+   `public/og.jpg` is the AETHERFIELD social card.
 
    **Picker: measured, understood, not fully eliminated.** An earlier
    claim in this file that the flake was "gone" was wrong — three clean
@@ -65,17 +66,25 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
    ### What shipped this pass (newest first)
 
-   - **Aetherfield.** Loading boot, title screen, HUD, OG, meta tags.
-     Title shows **every visit**. Three buttons: Enter the Multiverse,
-     Instructions, Settings. Tiny Wizards disclaimer at the bottom.
-     HUD wordmark returns home; "?" opens instructions without leaving
-     play. `store.shell` is `title` | `play` so WASD/`/` cannot fire
-     through the menu. Star labels are suppressed while `shell ===
-     'title'` (they are canvas-drawn, not DOM). Capture harness calls
-     `__mcu.ui.enter()` unless `--intro`.
-   - The HTML `#boot` overlay is the loader (five-arm mark + wordmark +
-     pips). The old JS `loading.ts` overlay is gone; it sat under `#boot`
-     and never showed.
+   - **PWA.** `manifest.webmanifest`, 192/512/maskable icons, production
+     service worker (`/sw.js`, registered only in `import.meta.env.PROD`).
+     `display: standalone`. iOS: apple-touch-icon + apple-mobile-web-app-capable.
+     Landing shows **Install app** only when `beforeinstallprompt` fires.
+   - **Tour** replaced the instructions overlay. Seven coach-marks over
+     the live chrome. Title **Tour** button and HUD **?** both start it.
+     Esc / Skip ends it.
+   - **ApexForge credit** on the title footer, linking to
+     https://ame-apexforge.org/
+   - **Aetherfield rebrand + title screen every visit.** Enter the
+     Multiverse / Tour / Settings. `store.shell` is `title` | `play`.
+     Star labels suppressed while on the title (canvas-drawn, not DOM).
+     Capture harness calls `__mcu.ui.enter()` unless `--intro`.
+   - Search sits beside Settings; no Ctrl+K placeholder; no hairline
+     under the closed dropdown. Auto-rotate defaults on. Colourless is
+     off and disabled until a colour pip is selected. Filter hover tips.
+     Grid toggle removed (it never drew anything).
+   - The HTML `#boot` overlay is the loader. The old JS `loading.ts`
+     overlay is gone.
 
    - **Printing thread.** Selecting a card draws a line through its
      printings in release order. Because angle is colour identity and
@@ -135,10 +144,6 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
   dead space. Do not "improve" this without looking at the output.
 - Default filter hides tokens and art cards, so the HUD reads
   `111,720 of 117,621` until that box is unchecked. Intentional.
-- On a phone the Instructions panel's Controls section is below the
-  fold. First-time visitors now see the title screen instead, so this is
-  even less of a first-run problem. Left alone; shortening it would
-  cost the desktop reading.
 - A capture and the interaction suite will steal the GPU from each other.
   Run them sequentially, and prefer a static `vite preview` build for
   benchmarking — a dev-server hot reload kills a run mid-flight.
