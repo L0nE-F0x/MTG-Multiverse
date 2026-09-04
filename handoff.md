@@ -13,6 +13,37 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 # ▶ START HERE — next session
 
+**2026-09-05 — how this repo reaches Filthy Net Deck. Read before assuming.**
+
+Owner is continuing tonight with other models, and asked whether pushing here
+updates the galaxy inside FND. **It does not.**
+
+FND embeds a *vendored copy of this repo's built `dist/`*, at
+`public/aetherfield/` inside its app bundle, refreshed by `npm run aetherfield`
+in the FND repo. The iframe points at a local path, never at Netlify. So:
+
+- Pushing here updates **only** https://mtg-multiverse.netlify.app.
+- Getting a change into FND needs `npm run aetherfield` there, a commit, **and
+  a version bump plus a full release** — FND users run installers.
+- Renaming or re-domaining this Netlify site therefore **cannot break FND**.
+  The only URL-dependent thing here is `%SITE_URL%` in `vite.config.ts`, used
+  for `og:`/canonical tags, and Netlify supplies it.
+
+Owner is considering serving this at `filthy-net-deck.com/aetherfield`, either
+as a subdomain alias or a Netlify path proxy. Either works untouched, because
+`base: './'` makes every asset document-relative — that is exactly why it was
+set. Details and the trade-offs of switching FND to load remotely are in FND's
+`handoff.md`.
+
+**If FND ever does load this over the network**, `src/core/embed.ts` keeps
+working — `postMessage` is cross-origin-safe and it already targets `'*'` — but
+the host's message check should gain an origin test. Noted on the FND side too.
+
+**Title screen inside a host:** currently skipped via `?shell=play`. The owner
+wants it back for the tour. If it is re-enabled, hide the INSTALL APP button
+when `isEmbedded()` — `beforeinstallprompt` never fires in a Tauri webview, so
+it is a button that does nothing.
+
 **2026-09-05 — panel-aware framing, persistent settings, overlay scaling.**
 Shipped inside Filthy Net Deck v3.6.1. Owner found the galaxy centring on the
 whole canvas with its left third under the filter panel, and the layout
