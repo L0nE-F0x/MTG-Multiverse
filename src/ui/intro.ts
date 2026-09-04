@@ -143,7 +143,9 @@ export function mountIntro(root: HTMLElement, universe: Universe): IntroHandle {
       document.createTextNode(
         'Six layouts wait along the bottom edge, filters live on the left, visual settings sit top-right. ' +
           'Fly in close on any star and its actual card art materialises around you; ' +
-          'at middle distances the most-played cards label themselves.',
+          'at middle distances the most-played cards label themselves. Open a card and ' +
+          'a thread joins its printings in release order — for something reprinted as ' +
+          'often as Sol Ring, that runs from the core all the way to the rim.',
       ),
     ]),
   ]);

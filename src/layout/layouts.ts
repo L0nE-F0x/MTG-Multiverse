@@ -178,7 +178,7 @@ export function computeLayout(mode: LayoutMode, ctx: LayoutContext, out: Float32
 function galaxy(ctx: LayoutContext, out: Float32Array): void {
   const { universe, chronoRank } = ctx;
   const n = universe.count;
-  const { colorIdentity, typeMask, setIdx } = universe.col;
+  const { colorIdentity, typeMask, setIdx, oracleIdx } = universe.col;
 
   const TWIST = 0.0092;
   const ARM_SIGMA = 0.19;
@@ -199,7 +199,14 @@ function galaxy(ctx: LayoutContext, out: Float32Array): void {
     if (id.count === 0 && !isLand) {
       // Colourless artifacts belong to no arm, so they become the halo: full
       // circle, thick, faintly filling the space between the arms.
-      theta = hash2(i, 11) * TAU;
+      //
+      // The angle is keyed to the *card*, not the printing. Hashing the row
+      // index instead scattered Sol Ring's 133 printings around the whole
+      // circle, which is arbitrary — a coloured card's reprints all share an
+      // arm, so a colourless one should share a direction. Now its reprints
+      // run outward from the core through the eras that reprinted it, exactly
+      // as radius-is-time promises.
+      theta = hash2(oracleIdx[i], 11) * TAU;
       thickness = 26 + 0.09 * r;
     } else {
       // A small per-set angular offset makes each set clump slightly inside its

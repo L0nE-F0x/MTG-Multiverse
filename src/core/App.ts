@@ -7,6 +7,7 @@ import { Picker } from '../render/Picker.ts';
 import { CardBillboards } from '../render/CardBillboards.ts';
 import { StarLabels } from '../render/StarLabels.ts';
 import { CoreGlow } from '../render/CoreGlow.ts';
+import { PrintingTrail } from '../render/PrintingTrail.ts';
 import { createPostChain, type PostChain } from '../render/post.ts';
 import type { Universe } from '../data/universe.ts';
 
@@ -48,6 +49,7 @@ export class App {
   private readonly billboards: CardBillboards;
   private readonly labels: StarLabels;
   private readonly coreGlow = new CoreGlow();
+  private readonly printingTrail: PrintingTrail;
   private readonly post: PostChain;
   private readonly universe: Universe;
   private readonly canvas: HTMLCanvasElement;
@@ -99,12 +101,14 @@ export class App {
 
     this.billboards = new CardBillboards(universe, this.starfield, this.mask);
     this.labels = new StarLabels(universe, this.starfield, this.mask);
+    this.printingTrail = new PrintingTrail(universe, this.starfield);
 
     this.scene.add(this.nebula.compositeMesh);
     this.scene.add(this.starfield.points);
     this.scene.add(this.billboards.group);
     this.scene.add(this.labels.group);
     this.scene.add(this.coreGlow.group);
+    this.scene.add(this.printingTrail.line);
 
     this.post = createPostChain(this.renderer, this.scene, this.camera);
 
@@ -274,6 +278,10 @@ export class App {
       this.rig.setPhi(this.starfield.framePhi());
     }
     this.applyNebulaDensity();
+    // Only galaxy, price and the year rings put time on the radius.
+    this.printingTrail.setLayoutSupported(
+      mode === 'galaxy' || mode === 'price' || mode === 'timeline',
+    );
   }
 
   /**
@@ -330,6 +338,7 @@ export class App {
 
   private applySelection(i: number): void {
     this.starfield.material.uniforms.uSelected.value = i;
+    this.printingTrail.setCard(i);
     if (i < 0) return;
     this.starfield.positionOf(i, this.tmpVec);
     // Always close the distance on select, so picking a search result on the
@@ -368,6 +377,7 @@ export class App {
     );
     this.labels.update(dt, this.camera, this.rig.distance);
     this.coreGlow.update(dt);
+    this.printingTrail.update(dt);
 
     this.nebula.render(this.renderer, this.camera, time);
     this.post.composer.render(dt);
@@ -483,6 +493,7 @@ export class App {
     this.billboards.dispose();
     this.labels.dispose();
     this.coreGlow.dispose();
+    this.printingTrail.dispose();
     this.post.dispose();
     this.renderer.dispose();
   }

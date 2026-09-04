@@ -19,6 +19,11 @@ distances the most-played cards label themselves, so the landmarks announce
 what you are looking at. Hover any star for its name, click it to open the card,
 and the URL updates so the view is shareable.
 
+Open a card and a thread joins its printings in release order. Because angle is
+colour identity and radius is release date, every printing of a card shares a
+direction — so the thread runs outward from the core through the eras that
+reprinted it.
+
 **Controls.** Drag to orbit, right/middle/shift-drag to pan, scroll to zoom.
 `WASD` or the arrow keys fly, `Q`/`E` rise and fall, `Shift` moves faster.
 `/` or `Ctrl+K` searches, `R` jumps to a random notable card, `F` reframes,
@@ -84,6 +89,7 @@ src/
   render/CardBillboards.ts  real card art, drawn at the stars when you get close
   render/StarLabels.ts      names for the most-played cards currently in view
   render/CoreGlow.ts        the galactic nucleus
+  render/PrintingTrail.ts   threads a selected card's printings through time
   ui/                overlays; imports the store and nothing else
 tools/               offline pipeline + capture harness (Node, run directly)
 ```
