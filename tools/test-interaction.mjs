@@ -44,7 +44,14 @@ async function settleCamera(page, timeout = 15000) {
   while (Date.now() - started < timeout) {
     const now = await page.evaluate(() => {
       const r = window.__mcu.app.rig;
-      return [r.distance, ...r.target.toArray()].map((n) => Math.round(n * 10) / 10).join(',');
+      // Include the camera's actual position, not just distance and target.
+      // Orbit angle damps on its own spring, so theta could still be drifting
+      // after those two had settled — moving the star several pixels across
+      // the screen between computing its coordinates and putting the cursor
+      // there. That is the most likely source of the occasional missed pick.
+      return [r.distance, ...r.target.toArray(), ...r.camera.position.toArray()]
+        .map((n) => Math.round(n * 10) / 10)
+        .join(',');
     });
     if (now === previous) return true;
     previous = now;
@@ -170,12 +177,16 @@ try {
   check('hovered card is the one under the cursor', hovered.hovered === target.i,
     `expected "${target.name}", got "${hovered.name ?? 'none'}"`);
 
-  const tooltipVisible = await page.evaluate(() => {
+  // Wait rather than read once. The tooltip renders on the next animation
+  // frame after `hovered` changes, and now that the hover itself may resolve on
+  // a retry nudge, reading immediately raced it and reported a failure for a
+  // tooltip that was about to appear.
+  const tooltipVisible = await waitFor(page, () => {
     const t = document.querySelector('.mcu-tooltip');
     if (!t) return false;
     const cs = getComputedStyle(t);
     return cs.opacity !== '0' && cs.display !== 'none' && cs.visibility !== 'hidden';
-  });
+  }, 3000);
   check('hover tooltip is visible', tooltipVisible);
 
   // --- click ---------------------------------------------------------------

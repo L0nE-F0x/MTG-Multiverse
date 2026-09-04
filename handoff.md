@@ -48,8 +48,19 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
    would, and **reports the attempt count** when more than one was
    needed. That deliberately keeps the flake visible rather than papering
    over it: if runs start needing 2-3 nudges routinely, that is a real
-   regression and it will say so. Three consecutive runs after this
-   change: 22/22, 22/22, 22/22 (the third needed 2 nudges).
+   regression and it will say so.
+
+   Three hypotheses about the underlying cause were tried and all three
+   were wrong — a hung readback, a stalled `inFlight` flag, and orbit
+   angle still drifting after distance and target had settled. The first
+   two produced real hardening that is worth keeping (stall-abandon plus
+   a per-request generation guard); the third changed nothing. Do not
+   assume a fourth guess is right without measuring first: the
+   `.pickloop` style harness in the git history for this session is the
+   way to get a number.
+
+   Six runs across the two most recent variants: 22/22 every time, with
+   two of the six needing a second nudge.
 
    ### What shipped this pass (newest first)
 
