@@ -60,6 +60,14 @@ re-running `data:build` — the loader refuses a mismatched version on purpose.
   Lotus and get whatever floated in front of it. Nothing occludes anything in an
   additively-blended starfield, so camera depth carries no meaning here. This is
   also why `pick.frag` is GLSL3: GLSL1 has no `gl_FragDepth`.
+- **An async readback that never settles wedges picking permanently.**
+  `readRenderTargetPixelsAsync` occasionally neither resolves nor rejects. The
+  first version kept a single `inFlight` flag, so one hung read silently blocked
+  every later pick and hover simply stopped. It self-heals as soon as the mouse
+  moves in normal use, which is why it presented as a ~50% test flake with a
+  stationary cursor rather than an obvious bug. `Picker` now abandons a read
+  after `STALL_MS` and tags each request with a generation so a late reply from
+  an abandoned one cannot clobber a newer result.
 - **A translucent background cannot mask scrolled content.** The intro's sticky
   CTA used `var(--mcu-panel-bg)` (0.78 alpha) and the controls list showed
   straight through it. Anything that has to occlude needs a near-opaque colour,
@@ -124,6 +132,11 @@ live between the input and the store — GPU picking reading the wrong pixel, th
 pick buffer being scaled by devicePixelRatio, click-versus-drag disambiguation —
 and none of them are visible if you only set store state programmatically. It
 caught the picking bug above, which had looked fine in every screenshot.
+
+`App.setQualityTier(n)` pins the adaptive ladder (`-1` resumes adapting). Both
+the capture harness and the benchmark need it: a hero image otherwise comes out
+soft because the controller dropped two tiers while the camera settled, and two
+benchmark scenarios cannot be compared if each ran at a different tier.
 
 Use `tools/screenshot.mjs` to iterate on visuals — it drives the system Chromium
 headless against the dev server and reports the WebGL renderer and current fps.

@@ -240,6 +240,40 @@ try {
       `${state.fps} fps, ${state.visible.toLocaleString()} visible`);
   }
 
+  // --- deep links ------------------------------------------------------------
+  // Shareable URLs are a shipped feature and a full page boot away from
+  // everything else the suite exercises, so they get their own navigation.
+  const deepUuid = await page.evaluate(() => {
+    const u = window.__mcu.universe;
+    return u.uuid(u.search('Sol Ring', 1)[0]);
+  });
+
+  await page.goto(`${URL}?card=${deepUuid}&layout=sets`, {
+    waitUntil: 'domcontentloaded', timeout: 30000,
+  });
+  await page.waitForFunction('window.__mcu !== undefined', { timeout: 120000, polling: 250 });
+  await sleep(2500);
+
+  const deep = await page.evaluate(() => {
+    const s = window.__mcu.store.state;
+    return {
+      layout: s.layout,
+      uuid: s.selected >= 0 ? window.__mcu.universe.uuid(s.selected) : null,
+      name: s.selected >= 0 ? window.__mcu.universe.name(s.selected) : null,
+    };
+  });
+  check('deep link restores the layout', deep.layout === 'sets', `got "${deep.layout}"`);
+  check('deep link selects the card', deep.uuid === deepUuid, `got "${deep.name ?? 'none'}"`);
+
+  // And the URL is written back, so what you share matches what you see.
+  await page.evaluate(() => {
+    window.__mcu.store.set('layout', 'galaxy');
+    window.__mcu.store.set('selected', -1);
+  });
+  await sleep(700);
+  const cleared = await page.evaluate(() => window.location.search);
+  check('URL clears once back to defaults', cleared === '', `search="${cleared}"`);
+
   check('no uncaught page errors', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 } finally {
   await browser.close();
