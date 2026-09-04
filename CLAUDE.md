@@ -107,6 +107,36 @@ assets.
 The host is verified against the *built* site, not the dev server, because
 `base` and the vendored folder only exist after a build.
 
+## The UI tells the renderer what it is covering
+
+`store.insets` is the third thing the store carries between the two layers, and
+it exists because the camera cannot see the DOM. The filter panel measures its
+own footprint and writes it; `App.resize()` turns that into a
+`camera.setViewOffset` so the layout centres on the space left over, and
+`Starfield.frameDistance(freeAspect)` pulls back far enough that it also *fits*
+there. Fitting vertically alone is not enough — the bounding sphere still fits
+top to bottom with a panel open, so nothing looks wrong from the maths' point
+of view while a third of the disc sits underneath it.
+
+**Shift the projection, never the camera or the scene.** `setViewOffset` edits
+the projection matrix, so the picker (which renders its pass with this same
+camera), the label and billboard projections, and the nebula's ray
+reconstruction all follow for free. Move the camera sideways instead and
+picking silently disagrees with the screen by exactly the offset — the same
+shape of bug as the dpr-scaled pick buffer, and just as invisible in a
+screenshot. The interaction suite's "hovered card is the one under the cursor"
+is what catches it.
+
+`--mcu-inset-left` carries the same number into CSS, because the layout
+switcher has to centre on the free area too; centring it on the canvas put it
+on top of the panel, and it wins the z-order.
+
+**`ui/scale.ts` uses `zoom`, not `transform: scale()`.** A transform blurs text
+and does not change layout, so the panel would keep reserving its unscaled
+width and the reported inset would disagree with what is on screen. The scale
+is also gated on `CSS.supports('zoom', …)`: reporting a scale the engine never
+applied would push the camera off by that factor.
+
 ## Visual tuning
 
 The nebula is the easiest thing to get wrong; it wants to be atmosphere, not

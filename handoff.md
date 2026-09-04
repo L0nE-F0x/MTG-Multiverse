@@ -13,6 +13,28 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 # ▶ START HERE — next session
 
+**2026-09-05 — panel-aware framing, persistent settings, overlay scaling.**
+Shipped inside Filthy Net Deck v3.6.1. Owner found the galaxy centring on the
+whole canvas with its left third under the filter panel, and the layout
+switcher sitting on top of that panel. Both now centre on what the panels
+leave; see `CLAUDE.md` → *The UI tells the renderer what it is covering*.
+
+`core/persist.ts` stores `visual` only. A host unmounts the document when you
+leave the page, so settings reset — which reads as forgetting, not reloading.
+Filters and layout are deliberately excluded: a filter is a query, and coming
+back to a galaxy hiding four fifths of its cards with no memory of asking is a
+bug report.
+
+**Nebula: investigated, deliberately unchanged.** Owner thought it sat left of
+the stars. `ARM_TWIST` and `TWIST` both read 0.0092, and every structural term
+in `densityAt` is measured from the world origin exactly as the stars are. The
+only asymmetry is the noise, sampled with a time-varying offset, so the densest
+gas wanders by design. Owner re-checked after the centring fix and agreed. If
+this comes up again, measure luminance centroids with the nebula on and off —
+do not nudge it.
+
+Interaction suite 36/36 after all of it, picking included.
+
 **2026-09-04 (later) — Aetherfield is now embeddable in a host app.**
 Filthy Net Deck (`L0nE-F0x/Filthy-Net-Deck`) shows this site in a sidebar page,
 in an iframe over its vendored copy of `dist/`. Contract and rationale are in
