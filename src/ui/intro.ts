@@ -141,11 +141,11 @@ export function mountIntro(root: HTMLElement, universe: Universe): IntroHandle {
     ]),
     el('p', { className: 'mcu-intro-body' }, [
       document.createTextNode(
-        'Six layouts wait along the bottom edge, filters live on the left, visual settings sit top-right. ' +
-          'Fly in close on any star and its actual card art materialises around you; ' +
-          'at middle distances the most-played cards label themselves. Open a card and ' +
-          'a thread joins its printings in release order — for something reprinted as ' +
-          'often as Sol Ring, that runs from the core all the way to the rim.',
+        // Kept to one line deliberately. Everything else this used to say — where
+        // the layouts, filters and settings live — is plainly visible on screen,
+        // and the panel has to end on the controls list without clipping.
+        'Fly close and the real card art appears; opening a card threads its ' +
+          'printings from the core to the rim.',
       ),
     ]),
   ]);

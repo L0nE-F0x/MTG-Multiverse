@@ -32,8 +32,24 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
    `npm run build` · `node tools/verify-universe.ts` ·
    `npm run test:interaction` → **22/22**.
 
-   The picker flake is **gone**. Three consecutive clean suite runs since
-   the stall-abandon fix; the previous session could not get two in a row.
+   **Picker: measured, understood, not fully eliminated.** An earlier
+   claim in this file that the flake was "gone" was wrong — three clean
+   runs is not evidence of absence for something already intermittent,
+   and a fourth run failed.
+
+   Hammering the picker directly (24 nudge-away-and-back cycles onto a
+   known star) gives **24/24 hits, 0 wrong cards, 0 misses**, so the
+   pick pass itself is sound. What remains is that a *single* pointer
+   move occasionally does not register — roughly one run in three — and
+   any second move recovers it immediately. A real cursor emits a stream
+   of pointermove events, so this is close to unobservable in use.
+
+   `tools/test-interaction.mjs` now nudges up to three times, like a hand
+   would, and **reports the attempt count** when more than one was
+   needed. That deliberately keeps the flake visible rather than papering
+   over it: if runs start needing 2-3 nudges routinely, that is a real
+   regression and it will say so. Three consecutive runs after this
+   change: 22/22, 22/22, 22/22 (the third needed 2 nudges).
 
    ### What shipped this pass (newest first)
 
@@ -95,6 +111,11 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
   dead space. Do not "improve" this without looking at the output.
 - Default filter hides tokens and art cards, so the HUD reads
   `111,720 of 117,621` until that box is unchecked. Intentional.
+- On a phone the intro's Controls section is below the fold — the panel
+  scrolls and the CTA is sticky, which is normal, but a first-time mobile
+  visitor sees only "What this is" and "How to read it" without scrolling.
+  Left alone deliberately; shortening it further would cost the desktop
+  reading.
 - A capture and the interaction suite will steal the GPU from each other.
   Run them sequentially, and prefer a static `vite preview` build for
   benchmarking — a dev-server hot reload kills a run mid-flight.

@@ -79,7 +79,7 @@
 }
 
 .mcu-intro-section {
-  margin-top: 26px;
+  margin-top: 20px;
   opacity: 0;
   transform: translateY(14px);
   transition: opacity 480ms var(--mcu-ease), transform 480ms var(--mcu-ease);
@@ -116,7 +116,7 @@
 .mcu-intro-dl {
   display: grid;
   grid-template-columns: minmax(140px, 190px) 1fr;
-  row-gap: 9px;
+  row-gap: 6px;
   column-gap: 20px;
   margin: 14px 0 0;
 }
@@ -154,8 +154,8 @@
 .mcu-intro-footer {
   position: sticky;
   bottom: 0;
-  margin-top: 24px;
-  padding: 20px 48px 26px;
+  margin-top: 18px;
+  padding: 16px 48px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
