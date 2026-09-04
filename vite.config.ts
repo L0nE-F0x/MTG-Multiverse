@@ -30,6 +30,15 @@ function siteUrl(): Plugin {
 }
 
 export default defineConfig({
+  /**
+   * Relative asset URLs, so the built site works from a subdirectory as well
+   * as from a domain root. Filthy Net Deck vendors `dist/` into its own
+   * `public/aetherfield/`, and an absolute `/assets/…` there would resolve
+   * against the host app's origin and collide with the host's own bundle.
+   * The data loads already use document-relative paths, so this is the only
+   * change the embed needs.
+   */
+  base: './',
   plugins: [glsl({ compress: false }), siteUrl()],
   server: { host: '127.0.0.1', port: 5173 },
   build: { target: 'es2022', assetsInlineLimit: 0 },

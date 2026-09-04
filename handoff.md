@@ -13,6 +13,28 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 # ▶ START HERE — next session
 
+**2026-09-04 (later) — Aetherfield is now embeddable in a host app.**
+Filthy Net Deck (`L0nE-F0x/Filthy-Net-Deck`) shows this site in a sidebar page,
+in an iframe over its vendored copy of `dist/`. Contract and rationale are in
+`CLAUDE.md` → *Embedding in a host app*; the FND side is documented in that
+repo's `docs/AETHERFIELD-EMBED.md`.
+
+What changed here, all gated so the public site is untouched:
+`base: './'` in `vite.config.ts` · new `src/core/embed.ts` (outbound-link
+bridge + ready/error ping, no-ops unless framed) · `?shell=play` in
+`urlState.ts` · `title.ts` uses `BASE_URL` for `mark.svg` instead of `/mark.svg`
+· the service worker no longer registers when framed.
+
+Verified against the **built** site, not the dev server — `base` only exists
+after a build. Public site: opens on the title screen, no failed requests, no
+`shell=` in the URL. Embedded: boots from a subdirectory, skips the title,
+posts `ready` with 117,621 cards, forwards outbound links.
+
+**Not done:** the Sets / DeckView deep links (`?set=`, `?cards=`) the owner
+parked for later. `filter.sets` and `filter.query` already exist in the store,
+so it is a `urlState.ts` vocabulary addition, not a renderer change.
+
+
 0. **2026-09-04, wrapped.** Owner is tinkering on the live site and will
    report back. Do not start autonomous polish. Wait for their notes.
 

@@ -72,7 +72,10 @@ export function mountTitle(root: HTMLElement, universe: Universe, host: TitleHos
 
   const mark = el('img', {
     className: 'mcu-title-mark',
-    attrs: { src: '/mark.svg', alt: '', width: '120', height: '120' },
+    // BASE_URL, not '/mark.svg': the site is also served from a subdirectory
+    // when a host app embeds the build, and a root-absolute path resolves
+    // against the host's origin, where this file does not exist.
+    attrs: { src: `${import.meta.env.BASE_URL}mark.svg`, alt: '', width: '120', height: '120' },
   });
 
   const installBtn = el('button', {

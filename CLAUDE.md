@@ -75,6 +75,38 @@ re-running `data:build` — the loader refuses a mismatched version on purpose.
 - Exposure is a uniform on the star material, not `renderer.toneMappingExposure`
   — tone mapping happens in the post chain, so the renderer's own is inert.
 
+## Embedding in a host app
+
+Filthy Net Deck ships this site as a built folder in its own `public/aetherfield/`
+and shows it in a same-origin iframe. Three things make that work, and each one
+looks like a pointless detail until it is missing:
+
+- **`base: './'` in `vite.config.ts`.** The site has to resolve its own assets
+  from a subdirectory. A root-absolute `/assets/…` resolves against the *host's*
+  origin, where it collides with the host's own bundle. The data loads were
+  already document-relative (`fetch('data/universe-meta.json')`), so this is the
+  only build change the embed needs — but it also means **no root-absolute paths
+  anywhere in `src/`**. Use `import.meta.env.BASE_URL` for anything in `public/`;
+  `title.ts` referenced `/mark.svg` and 404'd inside the host.
+- **`src/core/embed.ts` is the whole contract.** It forwards outbound links to
+  the host (`target="_blank"` does nothing in a Tauri webview — no error, no
+  navigation, the Scryfall link is simply dead) and posts a ready/error ping.
+  The ping is not decoration: an iframe fires `load` for a 404 page exactly as
+  it does for a real one, so from outside there is no other way to tell a
+  missing bundle from a slow boot.
+- **`?shell=play` skips the title screen.** A host has already asked "do you
+  want this?" with the button that opened us. `connectUrlState` only echoes the
+  parameter back when it was supplied, so the public site keeps a clean URL.
+
+Everything else — the renderer, the store, the UI layer — is unchanged, and
+`isEmbedded()` gates the differences so an ordinary browser visit pays nothing.
+The service worker is one of those differences: it belongs to the public site
+only, and registering it on the host's origin would quietly cache the host's
+assets.
+
+The host is verified against the *built* site, not the dev server, because
+`base` and the vendored folder only exist after a build.
+
 ## Visual tuning
 
 The nebula is the easiest thing to get wrong; it wants to be atmosphere, not
