@@ -294,9 +294,14 @@
   .mcu-card-panel {
     top: var(--mcu-mobile-panel-top);
     bottom: var(--mcu-mobile-panel-bottom);
+    /* Start clear of the filters tab on the left edge rather than covering it.
+       At 390px an 88vw panel reached x=37 while the tab occupies 10..54, so the
+       tab was unreachable whenever a card was open. Anchoring both edges keeps
+       the two controls independent at every width. */
+    left: calc(10px + var(--mcu-touch) + 14px);
     right: 10px;
-    width: 88vw;
-    max-width: 380px;
+    width: auto;
+    max-width: none;
     border-radius: 12px;
     padding: 16px;
   }

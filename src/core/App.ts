@@ -68,6 +68,7 @@ export class App {
   private fpsAccum = 0;
   private filterQueued = false;
   private tier = TOP_TIER;
+  private pinnedTier = false;
   private renderScale = 1;
   private tierCooldown = 0;
   private disposers: (() => void)[] = [];
@@ -123,8 +124,24 @@ export class App {
     this.applyFilter();
   }
 
-  /** Current nebula quality tier, 0 (cheapest) to 3. Diagnostics only. */
+  /** Current quality tier, 0 (cheapest) to TOP_TIER. Diagnostics only. */
   get qualityTier(): number { return this.tier; }
+
+  /**
+   * Pin the quality ladder, or pass -1 to resume adapting.
+   *
+   * The capture harness and the benchmark both need a fixed quality to produce
+   * comparable output: a hero image should not come out soft because the
+   * controller happened to drop two tiers while the camera was settling, and a
+   * benchmark scenario cannot be compared against another that ran at a
+   * different tier.
+   */
+  setQualityTier(tier: number): void {
+    this.pinnedTier = tier >= 0;
+    if (!this.pinnedTier) return;
+    this.tier = Math.max(0, Math.min(TOP_TIER, Math.round(tier)));
+    this.applyQuality();
+  }
 
   start(): void {
     if (this.running) return;
@@ -420,6 +437,7 @@ export class App {
    * two tiers every second.
    */
   private adaptQuality(fps: number, elapsed: number): void {
+    if (this.pinnedTier) return;
     this.tierCooldown = Math.max(0, this.tierCooldown - elapsed);
     if (this.tierCooldown > 0) return;
     // A morph or a filter crossfade briefly costs extra; do not down-rank on it.

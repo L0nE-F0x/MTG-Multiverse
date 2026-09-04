@@ -7,9 +7,15 @@ document.getElementById('ui-root').style.display = 'none';
 // Commander staples.
 window.__mcu.store.patchVisual({ showLabels: false });
 
+// Pin maximum quality. Otherwise the adaptive ladder drops a tier or two while
+// the camera settles and the hero image comes out soft and desaturated.
+window.__mcu.app.setQualityTier(5);
+
 const rig = window.__mcu.app.rig;
 rig.setAngles(0.55, 1.06);
-rig.frame(470); // closer than the default fit, so the disc fills a 1.9:1 crop
+// Tuned by eye against the 1.9:1 crop. Wider than this and the disc is a small
+// smudge with dead space around it; tighter and the nucleus fills the frame.
+rig.frame(470);
 
 // Scrim. The galaxy is bright and unpredictable exactly where the wordmark
 // sits, and without this the subtitle vanishes into the green arm.
