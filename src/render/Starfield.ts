@@ -136,9 +136,27 @@ export class Starfield {
    * naive height calculation said was fine. Fitting the bounding sphere is
    * exact, needs no per-layout tuning, and stays correct if a layout changes.
    */
-  frameDistance(): number {
+  /**
+   * Distance at which the whole layout fits on screen.
+   *
+   * `freeAspect` is the width-to-height ratio of the canvas area the UI panels
+   * are *not* covering. Vertical fit alone is not enough once something wide
+   * like the filter panel is open: the bounding sphere still fits top to
+   * bottom, so nothing looks wrong, while a third of the disc sits under the
+   * panel. Fitting the narrower of the two axes pulls back far enough that the
+   * layout clears the panel instead. Omit it and only the vertical fit
+   * applies, which is the old behaviour on an unobstructed canvas.
+   */
+  frameDistance(freeAspect?: number): number {
     const halfFov = (this.fovDegrees * Math.PI) / 360;
-    return (this.boundRadius / Math.sin(halfFov)) * 1.04;
+    const vertical = this.boundRadius / Math.sin(halfFov);
+    if (freeAspect === undefined || !Number.isFinite(freeAspect) || freeAspect <= 0) {
+      return vertical * 1.04;
+    }
+    // Half-angle subtended by the free width, from the vertical half-angle.
+    const halfFovFree = Math.atan(freeAspect * Math.tan(halfFov));
+    const horizontal = this.boundRadius / Math.sin(halfFovFree);
+    return Math.max(vertical, horizontal) * 1.04;
   }
   framePhi(): number { return layoutFramePhi(this.layout); }
 

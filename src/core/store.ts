@@ -52,6 +52,22 @@ export interface VisualState {
   autoRotate: boolean;
 }
 
+/**
+ * How much of the canvas the UI panels cover, in CSS pixels.
+ *
+ * The renderer cannot read the DOM and the UI cannot import three — the store
+ * is the only channel between them — so the panels report what they occlude
+ * and the camera frames the space that is left. Without this the galaxy
+ * centres on the whole canvas and the filter panel sits over its left third,
+ * which is exactly how it looked embedded in a host app with a sidebar.
+ */
+export interface ViewInsets {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
 export interface Stats {
   fps: number;
   visible: number;
@@ -77,6 +93,8 @@ export interface AppState {
   results: Int32Array;
   matchCount: number;
   stats: Stats;
+  /** Canvas area covered by UI. See ViewInsets. */
+  insets: ViewInsets;
 }
 
 export function defaultFilter(): FilterState {
@@ -95,6 +113,10 @@ export function defaultFilter(): FilterState {
     hideDigital: false,
     hideTokens: true,
   };
+}
+
+export function defaultInsets(): ViewInsets {
+  return { left: 0, right: 0, top: 0, bottom: 0 };
 }
 
 export function defaultVisual(): VisualState {
@@ -130,6 +152,7 @@ class Store {
     results: new Int32Array(0),
     matchCount: 0,
     stats: { fps: 0, visible: 0, total: 0, drawCalls: 0, ms: 0 },
+    insets: defaultInsets(),
   };
 
   private listeners = new Map<StateKey, Set<Listener<never>>>();

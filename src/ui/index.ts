@@ -13,6 +13,7 @@ import { mountSettings } from './settings.ts';
 import { mountTitle } from './title.ts';
 import { mountTour } from './tour.ts';
 import { mountTooltip } from './tooltip.ts';
+import { connectUiScale } from './scale.ts';
 
 export interface UIHandles {
   /** Renderer calls this each frame with the screen-space position of the hovered star, or null. */
@@ -25,6 +26,10 @@ export interface UIHandles {
 
 export function mountUI(root: HTMLElement, universe: Universe): UIHandles {
   root.classList.add('mcu-root');
+
+  // Set before anything measures itself. `filters` re-reports its footprint on
+  // every scale change, because its on-screen width moves with the zoom.
+  const offScale = connectUiScale(root, () => window.dispatchEvent(new Event('resize')));
 
   const settings = mountSettings(root);
   const play = { enter() {} };
@@ -53,6 +58,7 @@ export function mountUI(root: HTMLElement, universe: Universe): UIHandles {
     openTitle: () => title.open(),
     openTour: () => tour.start(),
     destroy() {
+      offScale();
       tour.destroy();
       title.destroy();
       hud.destroy();

@@ -3,13 +3,14 @@
  * `store.patchFilter` (or, for reset, `store.set('filter', ...)`) and reads
  * back `store.state.filter` to stay in sync with external changes.
  */
-import { defaultFilter, store } from '../core/store.ts';
+import { defaultFilter, defaultInsets, store } from '../core/store.ts';
 import type { ColorMatch } from '../core/store.ts';
 import { COLOR_LETTERS, releaseDayToYear } from '../data/format.ts';
 import type { ColorLetter, FormatName, TypeName } from '../data/format.ts';
 import type { Universe } from '../data/universe.ts';
 import { capitalize, el, fmtInt, listen } from './dom.ts';
 import { createDualRangeSlider } from './rangeSlider.ts';
+import { uiScale } from './scale.ts';
 import { MANA_COLOR_HEX, rarityColor } from './theme.ts';
 import '../styles/filters.css';
 
@@ -397,10 +398,46 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
     },
   });
 
+  /**
+   * Gutter between the panel's outer edge and the content the camera frames.
+   * Small enough that the galaxy does not look banished to one side, large
+   * enough that its outermost stars are not tucked under the panel's shadow.
+   */
+  const INSET_GUTTER = 18;
+
+  /**
+   * Tell the renderer how much of the canvas this panel is standing on.
+   *
+   * Measured rather than hard-coded: the width lives in `filters.css`, and a
+   * change there would otherwise silently desync the camera from the panel.
+   * `offsetWidth` and the computed `left` are used instead of
+   * `getBoundingClientRect()` on purpose — the panel slides in on a transform,
+   * and a rect read mid-transition reports wherever the animation currently
+   * is, which would make the camera chase the panel across the screen.
+   */
+  function reportInset(open: boolean): void {
+    const element = open ? panel : tab;
+    const left = parseFloat(getComputedStyle(element).left) || 0;
+    const width = element.offsetWidth;
+    // `left` and `offsetWidth` are layout pixels, before the UI zoom; the
+    // camera works in the CSS pixels the canvas is actually sized in, so the
+    // footprint has to be converted or the inset is wrong by the scale factor.
+    const onScreen = (left + width + INSET_GUTTER) * uiScale();
+    const next = { ...defaultInsets(), left: Math.round(onScreen) };
+
+    const prev = store.state.insets;
+    if (prev.left === next.left) return;
+    // The CSS variable is the same number for anything that has to sit in the
+    // free area — the layout switcher centres on it.
+    root.style.setProperty('--mcu-inset-left', `${next.left}px`);
+    store.set('insets', next);
+  }
+
   function setOpen(open: boolean): void {
     panel.classList.toggle('mcu-filters--open', open);
     tab.classList.toggle('mcu-filters-tab--hidden', open);
     tab.setAttribute('aria-expanded', String(open));
+    reportInset(open);
   }
   tab.addEventListener('click', () => setOpen(true));
   const closeBtn = tip(
@@ -414,7 +451,15 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
   closeBtn.addEventListener('click', () => setOpen(false));
   header.append(closeBtn);
 
-  setOpen(window.matchMedia('(min-width: 900px)').matches);
+  const startOpen = window.matchMedia('(min-width: 900px)').matches;
+  setOpen(startOpen);
+
+  // The panel is full-height, so its footprint only changes with the viewport;
+  // re-measure on resize so the camera does not keep an inset from a width the
+  // window no longer has.
+  const offResize = listen(window, 'resize', () =>
+    reportInset(panel.classList.contains('mcu-filters--open')),
+  );
 
   const floatTip = el('div', {
     className: 'mcu-float-tip',
@@ -453,10 +498,19 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
 
   root.append(tab, panel, floatTip);
 
+  // Measure only once the panel is actually in the document. `setOpen` runs
+  // during construction, before this append, where `offsetWidth` is 0 and the
+  // computed `left` is `auto` — so the first report was the gutter alone and
+  // the camera never learned the panel was there.
+  reportInset(panel.classList.contains('mcu-filters--open'));
+
   return {
     destroy() {
       offFilter();
       offSetSearch();
+      offResize();
+      root.style.removeProperty('--mcu-inset-left');
+      store.set('insets', defaultInsets());
       offTipOver();
       offTipOut();
       yearSlider.destroy();

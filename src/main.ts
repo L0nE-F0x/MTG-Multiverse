@@ -3,6 +3,7 @@ import { loadUniverse } from './data/universe.ts';
 import { App } from './core/App.ts';
 import { connectUrlState } from './core/urlState.ts';
 import { connectEmbed, isEmbedded, notifyHost } from './core/embed.ts';
+import { connectSettingsPersistence, restoreSettings } from './core/persist.ts';
 
 /** Handles exposed by the UI layer; mirrored here so main does not hard-depend on it. */
 interface UIHandles {
@@ -51,6 +52,10 @@ async function main(): Promise<void> {
     setBoot(fraction, label);
   });
 
+  // Before the UI mounts, so the settings panel renders the stored values
+  // instead of flashing defaults and then correcting itself.
+  restoreSettings();
+
   // The UI layer is optional at runtime: if it fails to load, the galaxy still
   // flies. Keeps the renderer independently testable.
   let ui: UIHandles | null = null;
@@ -64,6 +69,7 @@ async function main(): Promise<void> {
   // Before the app starts, so a ?card= link is already selected on first frame
   // and the camera flies straight to it rather than snapping afterwards.
   connectUrlState(universe);
+  connectSettingsPersistence();
 
   setBoot(0.9, 'Igniting stars');
   const app = new App(canvas, universe, {

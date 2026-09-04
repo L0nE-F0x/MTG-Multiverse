@@ -120,7 +120,7 @@ export class App {
     // smudge, then ease in. The low seeded damping relaxes back to normal over
     // the next second, so the approach starts slow and gathers pace instead of
     // sliding in at a constant rate.
-    const framed = this.starfield.frameDistance();
+    const framed = this.framedDistance();
     this.rig.setPhi(this.starfield.framePhi());
     this.rig.setRadius(framed * 3.4);
     this.rig.flyTo(new THREE.Vector3(0, 0, 0), framed, 0.62);
@@ -239,6 +239,15 @@ export class App {
         this.rig.setInputEnabled(mode === 'play');
         this.labels.setEnabled(store.state.visual.showLabels && mode === 'play');
       }),
+      // Collapsing the filter panel hands back a third of the width. Re-offset
+      // the projection and re-fit, so the layout drifts out to fill the space
+      // instead of staying hunched to one side of a canvas that grew.
+      store.on('insets', () => {
+        this.resize();
+        // Only when they are looking at the whole thing — someone flying among
+        // the stars did not ask to be yanked back out because a panel moved.
+        if (this.rig.distance > 260) this.rig.frame(this.framedDistance());
+      }),
     );
     this.rig.setInputEnabled(store.state.shell === 'play');
   }
@@ -246,7 +255,7 @@ export class App {
   /** Frame the whole current layout again, without changing the heading. */
   resetView(): void {
     store.set('selected', -1);
-    this.rig.frame(this.starfield.frameDistance());
+    this.rig.frame(this.framedDistance());
     this.rig.setPhi(this.starfield.framePhi());
   }
 
@@ -280,7 +289,7 @@ export class App {
     // Reframe only if the user is looking at the whole thing; if they are down
     // among the stars, leave them where they are.
     if (this.rig.distance > 260) {
-      this.rig.frame(this.starfield.frameDistance());
+      this.rig.frame(this.framedDistance());
       this.rig.setPhi(this.starfield.framePhi());
     }
     this.applyNebulaDensity();
@@ -352,14 +361,55 @@ export class App {
     this.rig.flyTo(this.tmpVec, Math.min(this.rig.distance, 120), 2.6);
   }
 
-  private resize(): void {
+  /**
+   * Canvas size in CSS pixels, and the slice of it the UI is not covering.
+   */
+  private viewport(): { cssW: number; cssH: number; freeW: number; insetLeft: number } {
     const cssW = Math.max(1, this.canvas.clientWidth || window.innerWidth);
     const cssH = Math.max(1, this.canvas.clientHeight || window.innerHeight);
+    const { left, right } = store.state.insets;
+    // Never let a panel claim so much that the remaining strip is unusable —
+    // a mis-measured inset should degrade the framing, not erase the view.
+    const insetLeft = Math.min(left, cssW * 0.5);
+    const freeW = Math.max(1, cssW - insetLeft - Math.min(right, cssW * 0.25));
+    return { cssW, cssH, freeW, insetLeft };
+  }
+
+  /** Distance that fits the layout into the space the UI leaves. */
+  private framedDistance(): number {
+    const { cssH, freeW } = this.viewport();
+    return this.starfield.frameDistance(freeW / cssH);
+  }
+
+  private resize(): void {
+    const { cssW, cssH, insetLeft } = this.viewport();
     const dpr = Math.min(window.devicePixelRatio || 1, 2) * this.renderScale;
 
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(cssW, cssH, false);
     this.camera.aspect = cssW / cssH;
+
+    /*
+     * Slide the whole image over by half of what the panels cover, so the
+     * layout sits in the middle of the space that is actually visible.
+     *
+     * `setViewOffset` rather than moving the camera or the scene: it edits the
+     * projection matrix, so everything that reads the camera follows for free
+     * — the picker (which renders the pick pass with this same camera), the
+     * label and billboard projections, and the nebula's ray directions. Move
+     * the camera sideways instead and the picker silently disagrees with the
+     * screen by the offset, which is the same class of bug as the dpr-scaled
+     * pick buffer.
+     *
+     * A negative offsetX shifts the frustum left, which puts the content
+     * right. Width and height match the full size, so this is a pure shift
+     * with no change of scale.
+     */
+    if (insetLeft > 0.5) {
+      this.camera.setViewOffset(cssW, cssH, -insetLeft / 2, 0, cssW, cssH);
+    } else {
+      this.camera.clearViewOffset();
+    }
     this.camera.updateProjectionMatrix();
 
     this.post.setSize(cssW, cssH);
