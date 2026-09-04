@@ -3,6 +3,7 @@
 **Read this first.** Live top-of-todo across model/agent handoffs.
 
 Repo: `L0nE-F0x/MTG-Multiverse`
+**Live: https://mtg-multiverse.netlify.app**
 · 117,621 printings as an explorable WebGL galaxy
 · Netlify auto-deploys `main` (`npm run build`, Node 22, publish `dist`)
 
@@ -21,7 +22,7 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
    | | |
    |---|---|
-   | Latest | `d033f38` *Thread a selected card's printings through the eras that reprinted it* |
+   | Latest | `3458aab` *Point the social tags at the canonical URL, not the branch deploy* |
    | Branch | `main` == `origin/main`, working tree clean |
    | Remote | https://github.com/L0nE-F0x/MTG-Multiverse |
 
@@ -60,6 +61,21 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
      by the nucleus glow, the nebula retune and the star labels.
    - **Deep-link coverage added** to the interaction suite: `?card=` +
      `?layout=` restore correctly, and the URL clears back to defaults.
+
+   - **Social tags were pointing at the wrong hostname.** Netlify sets
+     both `URL` (canonical) and `DEPLOY_PRIME_URL` (this deploy's own
+     address, `main--<site>.netlify.app` for a branch deploy of main).
+     `vite.config.ts` preferred the latter, so the live site advertised
+     `og:url`, `og:image` and `rel=canonical` on a host nobody would
+     share. Now chosen by `CONTEXT`, so previews still self-reference.
+     Found by fetching the deployed page, not by reading the config.
+
+   ### Live deploy verified
+
+   `https://mtg-multiverse.netlify.app` serves the current bundle (asset
+   hash matches a local build), `og.jpg` 200s at the canonical host, and
+   there are zero `main--` leaks left in the HTML. `/data/universe.bin`
+   (5.76 MB) and `universe-meta.json` (971 KB) both serve correctly.
 
    ### Verified by eye this pass
 
