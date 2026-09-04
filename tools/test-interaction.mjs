@@ -129,22 +129,17 @@ try {
     };
   });
   check('title screen is open after load', title.open);
-  check('title offers Enter, Instructions and Settings',
+  check('title offers Enter, Tour and Settings',
     title.labels.includes('Enter the Multiverse') &&
-    title.labels.includes('Instructions') &&
+    title.labels.includes('Tour') &&
     title.labels.includes('Settings'),
     title.labels.join(' | '));
   check('play chrome is hidden on the title screen', title.hudHidden);
   check('title screen carries the Wizards disclaimer', title.disclaimer);
-
-  check('Instructions opens the help overlay', await clickLabeledButton(page, '^\\s*Instructions\\s*$'));
-  await sleep(400);
-  check('help overlay is visible', await page.evaluate(() =>
-    !!document.querySelector('.mcu-intro--open')));
-  check('Back closes the help overlay', await clickLabeledButton(page, '^\\s*Back\\s*$'));
-  await sleep(400);
-  check('help overlay closed', await page.evaluate(() =>
-    !document.querySelector('.mcu-intro--open')));
+  check('title screen credits ApexForge', await page.evaluate(() => {
+    const a = document.querySelector('.mcu-title-credit-link');
+    return a instanceof HTMLAnchorElement && a.href.includes('ame-apexforge.org');
+  }));
 
   check('Settings opens the settings panel', await clickLabeledButton(page, '^\\s*Settings\\s*$'));
   await sleep(300);
@@ -167,6 +162,20 @@ try {
   check('title screen is closed after enter', !afterEnter.titleOpen);
   check('HUD is visible after enter', afterEnter.hudVisible);
   check('store.shell is play after enter', afterEnter.shell === 'play', `got "${afterEnter.shell}"`);
+
+  check('HUD ? starts the tour', await page.evaluate(() => {
+    const btn = document.querySelector('.mcu-about-btn');
+    if (!(btn instanceof HTMLButtonElement)) return false;
+    btn.click();
+    return !!document.querySelector('.mcu-tour--open');
+  }));
+  await sleep(400);
+  check('Skip ends the tour', await page.evaluate(() => {
+    const btn = [...document.querySelectorAll('.mcu-tour button')].find((b) => /^\s*Skip\s*$/i.test(b.textContent ?? ''));
+    if (!(btn instanceof HTMLButtonElement)) return false;
+    btn.click();
+    return !document.querySelector('.mcu-tour--open');
+  }));
 
   // Title auto-rotate leaves the heading wherever it drifted. Pin the default
   // angle so the Black Lotus pick is not at the mercy of how long the menu sat.

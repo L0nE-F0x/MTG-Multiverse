@@ -21,19 +21,16 @@ call. Reads/writes: none directly — it only composes the other modules.
 ### `title.ts` — `mountTitle(root, universe, host)`
 Cinematic title screen shown after boot on **every** visit, and again from
 the HUD wordmark. The galaxy keeps turning behind a vignette (not a frosted
-wall). Three actions: Enter the Multiverse, Instructions, Settings. A tiny
-Wizards-of-the-Coast disclaimer sits at the bottom.
+wall). Three actions: Enter the Multiverse, Tour, Settings. A tiny
+ApexForge credit and the Wizards disclaimer sit at the bottom. An
+"Install app" control appears only when the browser fires
+`beforeinstallprompt`.
 - Reads: `shell`, `visual.autoRotate`.
 - Writes: `shell` (`title` / `play`), `visual.autoRotate` (on while the
   title is up, restored on enter).
-- `host.toggleSettings` / `closeSettings` / `settingsOpen` are callbacks
-  into `settings.ts` so the landing Settings button can open the existing
-  panel without importing it.
-- Instructions is the previous intro content, now a separate overlay with
-  a Back button. The HUD "?" opens that overlay without leaving play.
-- Returns `{ open(), enter(), openHelp(), destroy() }`. `index.ts` also
-  exposes `enter` / `openTitle` / `openHelp` on `UIHandles` so the capture
-  harness can dismiss the title (`window.__mcu.ui.enter()`).
+- `host.onTour` starts the guided tour (which enters play first).
+- Returns `{ open(), enter(), destroy() }`. `index.ts` exposes `enter` /
+  `openTitle` / `openTour` on `UIHandles`.
 
 ### `hud.ts` — `mountHud(root, universe, hooks)`
 Top-left wordmark + live match count, a small "?" About control next to the
@@ -42,7 +39,7 @@ wordmark, and the bottom-centre layout-mode segmented control.
 - Writes: `layout` (via `store.set('layout', mode)` on click).
 - `universe.count` supplies the fixed "of N stars" denominator.
 - `hooks.onHome` is the wordmark click (return to the title screen);
-  `hooks.onHelp` is the "?" control (instructions overlay).
+  `hooks.onHelp` is the "?" control (guided tour).
 - The layout buttons carry `aria-pressed` reflecting `store.state.layout`;
   the match-count line has `aria-live="polite"` so screen readers announce
   it as filters narrow the result. Below 900px the segmented control is
@@ -50,6 +47,12 @@ wordmark, and the bottom-centre layout-mode segmented control.
   re-expand to its unwrapped width and forced the row onto two lines) so it
   compresses — wrapping its own label text — to stay on one row at
   phone widths while still hitting the 44px touch-target height.
+
+### `tour.ts` — `mountTour(root, host)`
+Guided coach-marks over the live chrome. Seven steps: how to read the
+galaxy, how to move, search, filters, layouts, looking closer, and the
+HUD. Spotlight is a hole in a dim veil; Esc / Skip ends it. `host.ensurePlay`
+is `title.enter()`.
 
 ### `search.ts` — `mountSearch(root, universe)`
 Top-centre search box with a keyboard-navigable results dropdown.
@@ -194,7 +197,7 @@ One file per component, each imported directly by its module
   one), and a `max-width: 900px` pass that grows shared chip/segmented/
   checkbox chrome to a real `--mcu-touch` (44px) hit area on phone-width
   viewports.
-- `title.css`, `intro.css` (the instructions overlay), `hud.css`,
+- `title.css`, `tour.css`, `hud.css`,
   `search.css`, `filters.css`, `cardPanel.css`, `tooltip.css`,
   `settings.css` — one per component above. The HTML `#boot` overlay in
   `index.html` is the loading screen; it is not a UI-layer module.

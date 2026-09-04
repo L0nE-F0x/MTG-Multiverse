@@ -4,8 +4,9 @@ Every Magic: The Gathering card ever printed — 117,621 of them — rendered as
 galaxy you can fly through.
 
 After load, a title screen sits over the turning galaxy. **Enter the Multiverse**
-drops you in; Instructions and Settings stay reachable from there, and from the
-HUD once you are flying.
+drops you in; **Tour** walks the chrome, and Settings stays reachable from there
+and from the HUD once you are flying. Install it as an app (Chrome / Edge /
+Android, or Add to Home Screen on iOS) to launch without the browser chrome.
 
 Nothing about the layout is decorative. A card's position *is* its data:
 

@@ -35,7 +35,7 @@ export function mountHud(root: HTMLElement, universe: Universe, hooks: HudHooks)
   const aboutBtn = el('button', {
     className: 'mcu-about-btn',
     text: '?',
-    attrs: { type: 'button', 'aria-label': `How to read ${BRAND}` },
+    attrs: { type: 'button', 'aria-label': `Tour ${BRAND}` },
   });
   aboutBtn.addEventListener('click', hooks.onHelp);
   const wordmark = el('button', {

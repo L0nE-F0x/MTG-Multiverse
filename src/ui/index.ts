@@ -11,6 +11,7 @@ import { mountHud } from './hud.ts';
 import { mountSearch } from './search.ts';
 import { mountSettings } from './settings.ts';
 import { mountTitle } from './title.ts';
+import { mountTour } from './tour.ts';
 import { mountTooltip } from './tooltip.ts';
 
 export interface UIHandles {
@@ -18,7 +19,7 @@ export interface UIHandles {
   setHoverAnchor(p: { x: number; y: number } | null): void;
   enter(): void;
   openTitle(): void;
-  openHelp(): void;
+  openTour(): void;
   destroy(): void;
 }
 
@@ -26,14 +27,18 @@ export function mountUI(root: HTMLElement, universe: Universe): UIHandles {
   root.classList.add('mcu-root');
 
   const settings = mountSettings(root);
+  const play = { enter() {} };
+  const tour = mountTour(root, { ensurePlay: () => play.enter() });
   const title = mountTitle(root, universe, {
     toggleSettings: () => settings.toggle(),
     closeSettings: () => settings.close(),
     settingsOpen: () => settings.isOpen(),
+    onTour: () => tour.start(),
   });
+  play.enter = () => title.enter();
   const hud = mountHud(root, universe, {
     onHome: () => title.open(),
-    onHelp: () => title.openHelp(),
+    onHelp: () => tour.start(),
   });
   const search = mountSearch(root, universe);
   const filters = mountFilters(root, universe);
@@ -46,8 +51,9 @@ export function mountUI(root: HTMLElement, universe: Universe): UIHandles {
     },
     enter: () => title.enter(),
     openTitle: () => title.open(),
-    openHelp: () => title.openHelp(),
+    openTour: () => tour.start(),
     destroy() {
+      tour.destroy();
       title.destroy();
       hud.destroy();
       search.destroy();

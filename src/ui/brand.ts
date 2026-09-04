@@ -5,3 +5,6 @@ export const BRAND_WORDMARK = 'AETHERFIELD';
 export const BRAND_TAGLINE = 'Every card. One galaxy.';
 export const DISCLAIMER =
   'Magic: The Gathering is a trademark of Wizards of the Coast. Aetherfield is an unofficial fan project and is not affiliated with Wizards of the Coast.';
+export const CREDIT_LABEL = 'Created by';
+export const CREDIT_NAME = 'ApexForge';
+export const CREDIT_HREF = 'https://ame-apexforge.org/';

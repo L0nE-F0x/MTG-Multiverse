@@ -59,12 +59,6 @@
   transform: translateY(0);
   opacity: 1;
 }
-.mcu-title--help .mcu-title-center,
-.mcu-title--help .mcu-title-disclaimer {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
 
 .mcu-title-mark {
   width: 108px;
@@ -186,12 +180,54 @@
   box-shadow: 0 0 16px rgba(94, 231, 255, 0.18);
 }
 
-.mcu-title-disclaimer {
+.mcu-title-footer {
   position: absolute;
   left: 24px;
   right: 24px;
-  bottom: 18px;
+  bottom: 16px;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.mcu-title-install {
+  pointer-events: auto;
+  cursor: pointer;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--mcu-cyan);
+  opacity: 0.8;
+}
+.mcu-title-install:hover {
+  opacity: 1;
+}
+
+.mcu-title-credit {
+  margin: 0;
+  pointer-events: auto;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--mcu-text-faint);
+  opacity: 0.7;
+}
+.mcu-title-credit-link {
+  color: var(--mcu-text-dim);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(140, 180, 255, 0.28);
+}
+.mcu-title-credit-link:hover {
+  color: var(--mcu-cyan);
+  border-bottom-color: var(--mcu-cyan);
+}
+
+.mcu-title-disclaimer {
   margin: 0 auto;
   max-width: 62ch;
   text-align: center;
@@ -222,10 +258,12 @@
     min-height: var(--mcu-touch);
   }
   .mcu-title-btn { min-height: var(--mcu-touch); }
-  .mcu-title-disclaimer {
-    bottom: 12px;
+  .mcu-title-footer {
+    bottom: 10px;
     left: 16px;
     right: 16px;
+  }
+  .mcu-title-disclaimer {
     font-size: 9px;
   }
 }

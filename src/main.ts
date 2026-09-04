@@ -8,7 +8,7 @@ interface UIHandles {
   setHoverAnchor(p: { x: number; y: number } | null): void;
   enter(): void;
   openTitle(): void;
-  openHelp(): void;
+  openTour(): void;
   destroy(): void;
 }
 
@@ -77,6 +77,10 @@ async function main(): Promise<void> {
   setTimeout(() => boot.root.remove(), 900);
 
   Object.assign(window as unknown as Record<string, unknown>, { __mcu: { app, universe, store, ui } });
+
+  if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+    void navigator.serviceWorker.register('/sw.js');
+  }
 }
 
 main().catch((err: unknown) => {

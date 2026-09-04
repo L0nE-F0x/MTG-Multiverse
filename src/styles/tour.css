@@ -1,0 +1,127 @@
+/* Guided tour: a dim veil with a hole over the current chrome, and a callout. */
+
+.mcu-tour {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 280ms var(--mcu-ease), visibility 0s 280ms;
+}
+.mcu-tour--open {
+  pointer-events: auto;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 280ms var(--mcu-ease), visibility 0s;
+}
+.mcu-tour--veil {
+  background: rgba(5, 6, 13, 0.72);
+}
+
+.mcu-tour-spot {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 14px;
+  box-shadow: 0 0 0 9999px rgba(5, 6, 13, 0.72);
+  outline: 1px solid rgba(94, 231, 255, 0.35);
+  opacity: 0;
+  transition: left 280ms var(--mcu-ease), top 280ms var(--mcu-ease),
+    width 280ms var(--mcu-ease), height 280ms var(--mcu-ease), opacity 200ms var(--mcu-ease);
+}
+.mcu-tour-spot--on {
+  opacity: 1;
+}
+
+.mcu-tour-card {
+  position: absolute;
+  z-index: 1;
+  width: min(420px, calc(100vw - 32px));
+  padding: 22px 22px 16px;
+  pointer-events: auto;
+}
+
+.mcu-tour-title {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--mcu-text);
+}
+
+.mcu-tour-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--mcu-text-dim);
+}
+
+.mcu-tour-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.mcu-tour-step {
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mcu-text-faint);
+}
+
+.mcu-tour-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.mcu-tour-skip,
+.mcu-tour-back,
+.mcu-tour-next {
+  pointer-events: auto;
+  cursor: pointer;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  transition: color 180ms var(--mcu-ease), border-color 180ms var(--mcu-ease),
+    background 180ms var(--mcu-ease);
+}
+.mcu-tour-skip,
+.mcu-tour-back {
+  color: var(--mcu-text-dim);
+  background: transparent;
+  border: 1px solid var(--mcu-border);
+}
+.mcu-tour-skip:hover,
+.mcu-tour-back:hover {
+  color: var(--mcu-text);
+  border-color: var(--mcu-border-strong);
+}
+.mcu-tour-back:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.mcu-tour-next {
+  color: #06111a;
+  background: linear-gradient(135deg, var(--mcu-cyan), var(--mcu-violet));
+  border: none;
+  box-shadow: 0 0 16px rgba(94, 231, 255, 0.3);
+}
+.mcu-tour-next:hover {
+  box-shadow: 0 0 22px rgba(94, 231, 255, 0.45);
+}
+
+@media (max-width: 900px) {
+  .mcu-tour-card { padding: 18px 16px 14px; }
+  .mcu-tour-skip,
+  .mcu-tour-back,
+  .mcu-tour-next { min-height: var(--mcu-touch); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mcu-tour-spot { transition: none; }
+}

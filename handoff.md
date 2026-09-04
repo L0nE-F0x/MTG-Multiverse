@@ -13,9 +13,8 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 # ▶ START HERE — next session
 
-0. **2026-09-04, filter/search polish.** Auto-rotate on by default, search
-   moved off the galaxy, filter hover tips, Colourless no longer glows at
-   rest, Grid toggle removed (it never drew anything).
+0. **2026-09-04, PWA + tour.** Installable standalone app, ApexForge credit
+   on the title, Instructions replaced by a guided tour.
 
    ### Git
 
