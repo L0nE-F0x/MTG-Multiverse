@@ -11,14 +11,25 @@ import type { Starfield } from './Starfield.ts';
  * Instead the same geometry is re-drawn with each index encoded as a colour,
  * scissored down to the single pixel under the cursor, and read back
  * asynchronously so the main thread never stalls on the GPU.
+ *
+ * A readback that never settles used to wedge picking permanently: nothing
+ * cleared `inFlight`, so every later pick was skipped and hover simply
+ * stopped working. It resolves often enough that this only showed up as an
+ * intermittent failure with a stationary cursor. Abandon a stalled read
+ * rather than waiting on it forever.
  */
+const STALL_MS = 400;
+
 export class Picker {
   private readonly target: THREE.WebGLRenderTarget;
   private readonly scene = new THREE.Scene();
   private readonly material: THREE.ShaderMaterial;
   private readonly points: THREE.Points;
-  private readonly pixel = new Uint8Array(4);
   private inFlight = false;
+  private inFlightSince = 0;
+  /** Bumped per request so a late reply from an abandoned read is ignored. */
+  private generation = 0;
+  private warned = false;
   private dirty = false;
   private px = 0;
   private py = 0;
@@ -81,9 +92,24 @@ export class Picker {
     camera: THREE.PerspectiveCamera,
     onResult: (index: number) => void,
   ): void {
-    if (!this.dirty || this.inFlight) return;
+    if (this.inFlight) {
+      if (performance.now() - this.inFlightSince <= STALL_MS) return;
+      // The outstanding promise is still out there; the generation bump
+      // below makes its result a no-op. Retry the last cursor position even
+      // if nothing has moved — a hung read with a stationary pointer used
+      // to stay hung forever because `dirty` was already false.
+      this.inFlight = false;
+      this.dirty = true;
+    }
+    if (!this.dirty) return;
+
     this.dirty = false;
     this.inFlight = true;
+    this.inFlightSince = performance.now();
+    const generation = ++this.generation;
+    // Each request owns its buffer so a late write from an abandoned read
+    // cannot clobber a newer one that is still in flight.
+    const pixel = new Uint8Array(4);
 
     const h = this.target.height;
     const x = Math.max(0, Math.min(this.target.width - 1, Math.round(this.px)));
@@ -106,14 +132,28 @@ export class Picker {
     renderer.setRenderTarget(prevTarget);
 
     renderer
-      .readRenderTargetPixelsAsync(this.target, x, y, 1, 1, this.pixel)
+      .readRenderTargetPixelsAsync(this.target, x, y, 1, 1, pixel)
       .then(() => {
-        const [r, g, b] = this.pixel;
+        if (generation !== this.generation) return; // superseded by a newer pick
+        const [r, g, b] = pixel;
         const id = r + g * 256 + b * 65536;
         onResult(id - 1); // the shader wrote index+1 so 0 can mean "empty"
       })
-      .catch(() => { /* context loss or a resize mid-read; drop this pick */ })
-      .finally(() => { this.inFlight = false; });
+      .catch((err: unknown) => {
+        // A dropped readback used to be fatal for as long as the pointer stayed
+        // still: nothing re-armed `dirty`, so hover remained stale until the
+        // mouse moved again. Interactively that self-heals and looks fine,
+        // which is exactly why it survived so long — it only showed up as a
+        // ~50% flake with a stationary cursor. Re-arm and try again.
+        if (generation === this.generation) this.dirty = true;
+        if (!this.warned) {
+          this.warned = true;
+          console.warn('[mcu] pick readback failed, retrying:', err);
+        }
+      })
+      .finally(() => {
+        if (generation === this.generation) this.inFlight = false;
+      });
   }
 
   dispose(): void {

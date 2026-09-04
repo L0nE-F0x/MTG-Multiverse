@@ -32,6 +32,37 @@ function check(name, ok, detail = '') {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Wait until the camera stops moving, rather than sleeping a fixed amount.
+ * Flights are spring-damped and the opening approach is deliberately slow, so
+ * any fixed wait is either wasteful or — under GPU load — too short, which
+ * showed up as the hover checks failing intermittently.
+ */
+async function settleCamera(page, timeout = 15000) {
+  const started = Date.now();
+  let previous = null;
+  while (Date.now() - started < timeout) {
+    const now = await page.evaluate(() => {
+      const r = window.__mcu.app.rig;
+      return [r.distance, ...r.target.toArray()].map((n) => Math.round(n * 10) / 10).join(',');
+    });
+    if (now === previous) return true;
+    previous = now;
+    await sleep(250);
+  }
+  return false;
+}
+
+/** Poll a predicate until it holds, so waits scale with the machine. */
+async function waitFor(page, fn, timeout = 6000) {
+  const started = Date.now();
+  while (Date.now() - started < timeout) {
+    if (await page.evaluate(fn)) return true;
+    await sleep(150);
+  }
+  return false;
+}
+
 const browser = await puppeteer.launch({
   executablePath,
   headless: true,
@@ -59,6 +90,7 @@ try {
   await page.waitForFunction('window.__mcu !== undefined', { timeout: 120000, polling: 250 });
   await sleep(1500);
 
+  await settleCamera(page); // the cinematic opening approach
   const count = await page.evaluate(() => window.__mcu.universe.count);
   check('universe loaded', count > 100000, `${count.toLocaleString()} cards`);
 
@@ -89,7 +121,7 @@ try {
     window.__mcu.store.set('selected', i);
     return { i, name: u.name(i) };
   });
-  await sleep(4000);
+  await settleCamera(page);
 
   // Drop the selection; we want hover to be what re-establishes it.
   await page.evaluate(() => window.__mcu.store.set('selected', -1));
@@ -116,7 +148,7 @@ try {
   await page.mouse.move(screenPos.x - 40, screenPos.y - 40);
   await sleep(200);
   await page.mouse.move(screenPos.x, screenPos.y);
-  await sleep(900);
+  await waitFor(page, () => window.__mcu.store.state.hovered >= 0);
 
   const hovered = await page.evaluate(() => {
     const s = window.__mcu.store.state;
@@ -137,7 +169,8 @@ try {
 
   // --- click ---------------------------------------------------------------
   await page.mouse.click(screenPos.x, screenPos.y);
-  await sleep(1200);
+  await waitFor(page, () => window.__mcu.store.state.selected >= 0);
+  await sleep(500); // let the panel's open transition finish
 
   const selected = await page.evaluate(() => {
     const s = window.__mcu.store.state;

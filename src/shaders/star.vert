@@ -44,7 +44,11 @@ void main() {
   float vis = mix(aVisPrev, aVisNext, uFilterMorph);
 
   float bright = aBright * mix(uDim, 1.0, vis);
-  float size = aSize * uStarSize * mix(0.5, 1.0, vis);
+  // Filtered-out stars shrink hard as well as dimming. Brightness alone is not
+  // enough: the excluded set usually outnumbers the matching one ten to one, so
+  // at half size they still add up to the same galaxy and the filter looks like
+  // it did nothing.
+  float size = aSize * uStarSize * mix(0.22, 1.0, vis);
 
   // Twinkle is per-star and slow; without the seed offset the whole field
   // pulses in unison and reads as a flicker bug.

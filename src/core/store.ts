@@ -103,7 +103,7 @@ export function defaultVisual(): VisualState {
     showLabels: true,
     showGrid: false,
     motionBlur: true,
-    dimFiltered: 0.06,
+    dimFiltered: 0.018,
     autoRotate: false,
   };
 }

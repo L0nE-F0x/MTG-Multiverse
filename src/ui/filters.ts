@@ -41,7 +41,7 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
     const btn = el('button', {
       className: 'mcu-color-pip',
       text: c,
-      attrs: { type: 'button', 'aria-label': `Colour ${c}` },
+      attrs: { type: 'button', 'aria-label': `Colour ${c}`, 'aria-pressed': 'false' },
     });
     btn.style.setProperty('--pip-color', MANA_COLOR_HEX[c] ?? '#888');
     btn.addEventListener('click', () => {
@@ -56,19 +56,22 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
   const colorlessBtn = el('button', {
     className: 'mcu-toggle-chip',
     text: 'Colourless',
-    attrs: { type: 'button' },
+    attrs: { type: 'button', 'aria-pressed': 'false' },
   });
   colorlessBtn.addEventListener('click', () => {
     store.patchFilter({ includeColorless: !store.state.filter.includeColorless });
   });
 
   const modeButtons = new Map<ColorMatch, HTMLButtonElement>();
-  const modeSeg = el('div', { className: 'mcu-segmented mcu-segmented--sm' });
+  const modeSeg = el('div', {
+    className: 'mcu-segmented mcu-segmented--sm',
+    attrs: { role: 'group', 'aria-label': 'Colour match mode' },
+  });
   (['any', 'exact', 'subset'] as ColorMatch[]).forEach((m) => {
     const b = el('button', {
       className: 'mcu-segmented-btn',
       text: capitalize(m),
-      attrs: { type: 'button' },
+      attrs: { type: 'button', 'aria-pressed': 'false' },
     });
     b.addEventListener('click', () => store.patchFilter({ colorMatch: m }));
     modeButtons.set(m, b);
@@ -77,9 +80,18 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
 
   function paintColor(): void {
     const f = store.state.filter;
-    for (const [c, btn] of pipButtons) btn.classList.toggle('mcu-color-pip--active', f.colors.has(c));
+    for (const [c, btn] of pipButtons) {
+      const active = f.colors.has(c);
+      btn.classList.toggle('mcu-color-pip--active', active);
+      btn.setAttribute('aria-pressed', String(active));
+    }
     colorlessBtn.classList.toggle('mcu-toggle-chip--active', f.includeColorless);
-    for (const [m, b] of modeButtons) b.classList.toggle('mcu-segmented-btn--active', f.colorMatch === m);
+    colorlessBtn.setAttribute('aria-pressed', String(f.includeColorless));
+    for (const [m, b] of modeButtons) {
+      const active = f.colorMatch === m;
+      b.classList.toggle('mcu-segmented-btn--active', active);
+      b.setAttribute('aria-pressed', String(active));
+    }
   }
   const colorSection = sectionWrap('Colour', [pipsRow, colorlessBtn, modeSeg]);
 
@@ -87,7 +99,11 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
   const typeButtons = new Map<TypeName, HTMLButtonElement>();
   const typeRow = el('div', { className: 'mcu-chip-grid' });
   for (const t of TYPE_LIST) {
-    const b = el('button', { className: 'mcu-toggle-chip', text: capitalize(t), attrs: { type: 'button' } });
+    const b = el('button', {
+      className: 'mcu-toggle-chip',
+      text: capitalize(t),
+      attrs: { type: 'button', 'aria-pressed': 'false' },
+    });
     b.addEventListener('click', () => {
       const types = new Set(store.state.filter.types);
       if (types.has(t)) types.delete(t);
@@ -99,7 +115,11 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
   }
   function paintTypes(): void {
     const f = store.state.filter;
-    for (const [t, b] of typeButtons) b.classList.toggle('mcu-toggle-chip--active', f.types.has(t));
+    for (const [t, b] of typeButtons) {
+      const active = f.types.has(t);
+      b.classList.toggle('mcu-toggle-chip--active', active);
+      b.setAttribute('aria-pressed', String(active));
+    }
   }
   const typeSection = sectionWrap('Type', [typeRow]);
 
@@ -110,7 +130,7 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
     const b = el('button', {
       className: 'mcu-toggle-chip mcu-toggle-chip--rarity',
       text: capitalize(name),
-      attrs: { type: 'button' },
+      attrs: { type: 'button', 'aria-pressed': 'false' },
     });
     b.style.setProperty('--rarity-color', rarityColor(name));
     b.addEventListener('click', () => {
@@ -124,7 +144,11 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
   });
   function paintRarities(): void {
     const f = store.state.filter;
-    for (const [idx, b] of rarityButtons) b.classList.toggle('mcu-toggle-chip--active', f.rarities.has(idx));
+    for (const [idx, b] of rarityButtons) {
+      const active = f.rarities.has(idx);
+      b.classList.toggle('mcu-toggle-chip--active', active);
+      b.setAttribute('aria-pressed', String(active));
+    }
   }
   const raritySection = sectionWrap('Rarity', [rarityRow]);
 
@@ -132,7 +156,11 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
   const formatButtons = new Map<FormatName, HTMLButtonElement>();
   const formatRow = el('div', { className: 'mcu-chip-grid' });
   for (const fmt of FORMAT_LIST) {
-    const b = el('button', { className: 'mcu-toggle-chip', text: capitalize(fmt), attrs: { type: 'button' } });
+    const b = el('button', {
+      className: 'mcu-toggle-chip',
+      text: capitalize(fmt),
+      attrs: { type: 'button', 'aria-pressed': 'false' },
+    });
     b.addEventListener('click', () => {
       const formats = new Set(store.state.filter.formats);
       if (formats.has(fmt)) formats.delete(fmt);
@@ -144,7 +172,11 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
   }
   function paintFormats(): void {
     const f = store.state.filter;
-    for (const [fmt, b] of formatButtons) b.classList.toggle('mcu-toggle-chip--active', f.formats.has(fmt));
+    for (const [fmt, b] of formatButtons) {
+      const active = f.formats.has(fmt);
+      b.classList.toggle('mcu-toggle-chip--active', active);
+      b.setAttribute('aria-pressed', String(active));
+    }
   }
   const formatSection = sectionWrap('Format', [formatRow]);
 
@@ -178,7 +210,10 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
   const setRows: { code: string; name: string; idx: number; row: HTMLElement }[] = [];
   universe.meta.sets.forEach((s, idx) => {
     const year = releaseDayToYear(s.released);
-    const row = el('div', { className: 'mcu-set-row' }, [
+    const row = el('button', {
+      className: 'mcu-set-row',
+      attrs: { type: 'button', 'aria-pressed': 'false' },
+    }, [
       el('span', { className: 'mcu-set-code', text: s.code.toUpperCase() }),
       el('span', { className: 'mcu-set-name', text: s.name }),
       el('span', { className: 'mcu-set-year', text: String(year) }),
@@ -202,7 +237,11 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
   const offSetSearch = listen(setSearchInput, 'input', filterSetRows);
   function paintSets(): void {
     const f = store.state.filter;
-    for (const { idx, row } of setRows) row.classList.toggle('mcu-set-row--active', f.sets.has(idx));
+    for (const { idx, row } of setRows) {
+      const active = f.sets.has(idx);
+      row.classList.toggle('mcu-set-row--active', active);
+      row.setAttribute('aria-pressed', String(active));
+    }
     setCountLabel.textContent = f.sets.size ? `${f.sets.size} set${f.sets.size === 1 ? '' : 's'} selected` : 'All sets';
   }
   const setSection = sectionWrap('Sets', [setSearchInput, setCountLabel, setListEl]);
@@ -252,20 +291,33 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
     yearSection, cmcSection, setSection, optionsSection,
   ]);
 
-  const panel = el('aside', { className: 'mcu-filters mcu-glass-panel' }, [
-    el('div', { className: 'mcu-corner mcu-corner--tl' }),
-    el('div', { className: 'mcu-corner mcu-corner--br' }),
-    body,
-  ]);
+  const panel = el(
+    'aside',
+    {
+      className: 'mcu-filters mcu-glass-panel',
+      attrs: { id: 'mcu-filters-panel', 'aria-label': 'Filters' },
+    },
+    [
+      el('div', { className: 'mcu-corner mcu-corner--tl' }),
+      el('div', { className: 'mcu-corner mcu-corner--br' }),
+      body,
+    ],
+  );
   const tab = el('button', {
     className: 'mcu-filters-tab',
     text: 'FILTERS',
-    attrs: { type: 'button', 'aria-label': 'Toggle filters panel' },
+    attrs: {
+      type: 'button',
+      'aria-label': 'Open filters panel',
+      'aria-expanded': 'false',
+      'aria-controls': 'mcu-filters-panel',
+    },
   });
 
   function setOpen(open: boolean): void {
     panel.classList.toggle('mcu-filters--open', open);
     tab.classList.toggle('mcu-filters-tab--hidden', open);
+    tab.setAttribute('aria-expanded', String(open));
   }
   tab.addEventListener('click', () => setOpen(true));
   const closeBtn = el('button', {

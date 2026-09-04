@@ -106,6 +106,51 @@
 }
 
 @media (max-width: 900px) {
-  .mcu-settings-toggle { top: 10px; right: 10px; padding: 7px 10px; font-size: 9px; }
-  .mcu-settings { top: 52px; right: 10px; width: 82vw; max-width: 300px; }
+  .mcu-settings-toggle {
+    top: 10px;
+    right: 10px;
+    padding: 7px 12px;
+    font-size: 9px;
+    min-height: var(--mcu-touch);
+    display: inline-flex;
+    align-items: center;
+  }
+  /* Sit clear of the top command bar/search and the bottom layout switcher
+     — see the matching comment in filters.css for why top:0/bottom:0 was
+     wrong on a phone-width viewport. */
+  .mcu-settings {
+    top: var(--mcu-mobile-panel-top);
+    bottom: var(--mcu-mobile-panel-bottom);
+    right: 10px;
+    width: 82vw;
+    max-width: 320px;
+    max-height: none;
+  }
+  .mcu-settings-row {
+    grid-template-columns: 76px 1fr 38px;
+    min-height: var(--mcu-touch);
+  }
+  /* Taller invisible hit box, same 3px visual line drawn with a hard-stop
+     gradient so the thumb doesn't turn into a thick painted bar. */
+  .mcu-settings-row input[type='range'] {
+    height: 28px;
+    background: linear-gradient(
+      to bottom,
+      transparent calc(50% - 1.5px),
+      rgba(255, 255, 255, 0.08) calc(50% - 1.5px),
+      rgba(255, 255, 255, 0.08) calc(50% + 1.5px),
+      transparent calc(50% + 1.5px)
+    );
+  }
+  .mcu-settings-row input[type='range']::-webkit-slider-thumb {
+    width: 20px;
+    height: 20px;
+  }
+  .mcu-settings-row input[type='range']::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+  }
+  .mcu-settings-row input[type='range']::-moz-range-track {
+    background: transparent;
+  }
 }

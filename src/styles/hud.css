@@ -55,6 +55,11 @@
   border-color: var(--mcu-border-strong);
   box-shadow: 0 0 10px rgba(94, 231, 255, 0.3);
 }
+/* Round focus ring for a round control — see the matching rule in
+   filters.css for why the extra `.mcu-root` ancestor is needed. */
+.mcu-root .mcu-about-btn:focus-visible {
+  border-radius: 50%;
+}
 .mcu-command-count {
   font-size: 10.5px;
   letter-spacing: 0.05em;
@@ -127,10 +132,26 @@
 }
 
 @media (max-width: 900px) {
-  .mcu-command-bar { top: 10px; left: 10px; padding: 8px 12px; }
+  .mcu-command-bar { top: 10px; left: 10px; padding: 8px 12px; max-width: calc(100vw - 20px); }
   .mcu-wordmark { font-size: 11px; }
-  .mcu-about-btn { width: 24px; height: 24px; font-size: 12px; }
+  .mcu-about-btn { width: var(--mcu-touch); height: var(--mcu-touch); font-size: 13px; }
   .mcu-layout-desc { display: none; }
-  .mcu-layout-btn { padding: 7px 8px; font-size: 9px; }
-  .mcu-layout-switcher { bottom: 12px; }
+  /* No flex-wrap here: these are flex-shrink children with wrapping text
+     (see .mcu-layout-btn below), so the row compresses to fit instead of
+     spilling to a second line — wrapping the row itself let each button
+     re-expand to its unwrapped single-line width and defeated that. */
+  .mcu-layout-segmented { max-width: calc(100vw - 20px); }
+  .mcu-layout-btn {
+    padding: 6px 6px;
+    font-size: 9px;
+    line-height: 1.25;
+    min-height: var(--mcu-touch);
+    flex: 1 1 0;
+    white-space: normal;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  .mcu-layout-switcher { bottom: 10px; max-width: calc(100vw - 20px); }
 }

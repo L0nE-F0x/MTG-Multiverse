@@ -2,6 +2,11 @@
 // crop, and lays the wordmark over it. Run via tools/screenshot.mjs --eval-file.
 document.getElementById('ui-root').style.display = 'none';
 
+// Card names are drawn into the canvas, not the UI overlay, so they survive
+// hiding the chrome — and a social card wants the galaxy, not a list of
+// Commander staples.
+window.__mcu.store.patchVisual({ showLabels: false });
+
 const rig = window.__mcu.app.rig;
 rig.setAngles(0.55, 1.06);
 rig.frame(470); // closer than the default fit, so the disc fills a 1.9:1 crop

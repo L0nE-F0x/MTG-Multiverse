@@ -123,6 +123,13 @@
   box-shadow: 0 0 14px var(--pip-color);
   transform: scale(1.08);
 }
+/* Round focus ring for a round control — beats base.css's shared 6px
+   rounded-rect default (same 2-class specificity, but this comes later in
+   the cascade via import order... except that's fragile, so it's scoped
+   with an extra `.mcu-root` ancestor to actually out-specificity it). */
+.mcu-root .mcu-color-pip:focus-visible {
+  border-radius: 50%;
+}
 
 .mcu-toggle-chip--rarity {
   border-color: color-mix(in srgb, var(--rarity-color) 45%, transparent);
@@ -231,11 +238,18 @@
 .mcu-set-row {
   display: grid;
   grid-template-columns: 40px 1fr 40px 44px;
+  align-items: center;
   gap: 6px;
+  width: 100%;
   padding: 5px 8px;
   font-size: 10.5px;
-  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: none;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  cursor: pointer;
 }
 .mcu-set-row:hover { background: rgba(94, 231, 255, 0.06); }
 .mcu-set-row--active { background: rgba(94, 231, 255, 0.14); color: var(--mcu-cyan); }
@@ -254,16 +268,63 @@
 }
 
 @media (max-width: 900px) {
+  /* Sit clear of the fixed top chrome (command bar + search) and the
+     bottom layout switcher — this used to be a full-height 0..0 drawer
+     that rendered *underneath* both, so their higher z-index cut its top
+     and bottom off. Floating between them keeps the whole panel legible
+     and still leaves the canvas draggable on every edge around it. */
   .mcu-filters {
-    top: 0;
-    bottom: 0;
-    left: 0;
+    top: var(--mcu-mobile-panel-top);
+    bottom: var(--mcu-mobile-panel-bottom);
+    left: 10px;
     width: 88vw;
     max-width: 340px;
-    border-radius: 0 12px 12px 0;
+    border-radius: 12px;
   }
   .mcu-filters-tab {
     top: 50%;
+    left: 10px;
     translate: 0 -50%;
+    width: var(--mcu-touch);
+    min-height: 88px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .mcu-filters-close {
+    width: var(--mcu-touch);
+    height: var(--mcu-touch);
+    font-size: 14px;
+  }
+  .mcu-reset-btn {
+    min-height: var(--mcu-touch);
+    padding: 8px 12px;
+  }
+  .mcu-color-pip {
+    width: var(--mcu-touch);
+    height: var(--mcu-touch);
+  }
+  .mcu-set-row {
+    padding: 10px 8px;
+    min-height: var(--mcu-touch);
+    align-items: center;
+  }
+  .mcu-set-search {
+    min-height: var(--mcu-touch);
+    font-size: 16px;
+  }
+  .mcu-range-track {
+    height: var(--mcu-touch);
+  }
+  .mcu-range-input {
+    height: var(--mcu-touch);
+  }
+  .mcu-range-input::-webkit-slider-thumb {
+    width: 22px;
+    height: 22px;
+  }
+  .mcu-range-input::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
   }
 }

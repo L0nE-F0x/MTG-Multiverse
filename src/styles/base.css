@@ -13,10 +13,15 @@
   --mcu-violet: #a56bff;
   --mcu-text: #dce6f5;
   --mcu-text-dim: #8a95ad;
-  --mcu-text-faint: #5a6379;
+  /* #7c88a3, not the old #5a6379 — that failed WCAG AA (~3.2:1) against
+     --mcu-panel-bg; this reads ~5.5:1 while staying visibly dimmer than
+     --mcu-text-dim. */
+  --mcu-text-faint: #7c88a3;
   --mcu-danger: #ff6b6b;
   --mcu-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --mcu-font: ui-sans-serif, 'Inter', system-ui, -apple-system, sans-serif;
+  /* Touch-target sizing, used from the max-width:900px breakpoints below. */
+  --mcu-touch: 44px;
 }
 
 /*
@@ -60,6 +65,34 @@
     animation-duration: 0.001ms !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+/* ---- Focus rings ------------------------------------------------------
+ * A visible-but-in-aesthetic focus ring for everything keyboard-reachable.
+ * Inputs that already paint their own focus treatment (search box, set
+ * search, range thumbs) opt out here and define their own :focus-visible
+ * rule alongside their existing style so there's never a double ring. */
+.mcu-root button:focus-visible,
+.mcu-root a:focus-visible,
+.mcu-root [tabindex]:focus-visible {
+  outline: 2px solid var(--mcu-cyan);
+  outline-offset: 2px;
+  border-radius: 6px;
+  box-shadow: 0 0 0 4px rgba(94, 231, 255, 0.18);
+}
+.mcu-root input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--mcu-cyan);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+.mcu-root input[type='range']:focus-visible {
+  outline: none;
+}
+.mcu-root input[type='range']:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgba(94, 231, 255, 0.35), 0 0 8px rgba(94, 231, 255, 0.6);
+}
+.mcu-root input[type='range']:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 4px rgba(94, 231, 255, 0.35), 0 0 8px rgba(94, 231, 255, 0.6);
 }
 
 /* ---- Shared panel chrome ------------------------------------------- */
@@ -197,4 +230,42 @@
 .mcu-checkbox-row input,
 .mcu-settings-checkbox-row input {
   accent-color: var(--mcu-cyan);
+}
+
+/* ---- Mobile touch targets ----------------------------------------------
+ * Shared chip/segmented/checkbox chrome grows to a real >=44px hit area
+ * below the tablet breakpoint; everything else stays visually compact. */
+@media (max-width: 900px) {
+  /* Command bar is ~88px tall once the about control is a 44px hit target,
+     so search sits below it and the side panels sit below search. Magic
+     numbers here used to leave search overlapping the wordmark. */
+  :root {
+    --mcu-mobile-search-top: 96px;
+    --mcu-mobile-panel-top: 158px;
+    --mcu-mobile-panel-bottom: 76px;
+  }
+  .mcu-toggle-chip {
+    padding: 11px 12px;
+    min-height: var(--mcu-touch);
+    display: inline-flex;
+    align-items: center;
+  }
+  .mcu-segmented-btn {
+    padding: 12px 14px;
+    min-height: var(--mcu-touch);
+  }
+  .mcu-segmented--sm .mcu-segmented-btn {
+    padding: 10px 12px;
+    min-height: 40px;
+  }
+  .mcu-checkbox-row,
+  .mcu-settings-checkbox-row {
+    padding: 10px 0;
+    min-height: var(--mcu-touch);
+  }
+  .mcu-checkbox-row input,
+  .mcu-settings-checkbox-row input {
+    width: 18px;
+    height: 18px;
+  }
 }

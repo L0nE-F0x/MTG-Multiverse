@@ -9,7 +9,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 7px 11px;
   background: var(--mcu-panel-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -24,16 +24,48 @@
 .mcu-tooltip--visible {
   opacity: 1;
 }
+.mcu-tooltip-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mcu-tooltip-rarity {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--rarity-color, var(--mcu-text-dim));
+  background: color-mix(in srgb, var(--rarity-color, transparent) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--rarity-color, var(--mcu-border)) 55%, transparent);
+}
 .mcu-tooltip-name {
   color: var(--mcu-text);
   font-weight: 600;
+  line-height: 1.2;
+}
+.mcu-tooltip-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.2;
 }
 .mcu-tooltip-set {
   color: var(--mcu-cyan);
   font-size: 9.5px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 2px 5px;
+  padding: 1px 5px;
   background: rgba(94, 231, 255, 0.1);
   border-radius: 4px;
+}
+.mcu-tooltip-year,
+.mcu-tooltip-mv {
+  color: var(--mcu-text-faint);
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
 }

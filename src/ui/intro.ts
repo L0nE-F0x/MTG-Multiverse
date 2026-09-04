@@ -131,12 +131,19 @@ export function mountIntro(root: HTMLElement, universe: Universe): IntroHandle {
         term: [kbd('/'), ' or ', kbd('Ctrl'), ' + ', kbd('K')],
         desc: 'Search — arrows and Enter pick a result.',
       },
+      {
+        term: [kbd('W'), kbd('A'), kbd('S'), kbd('D'), ' or arrows'],
+        desc: 'Fly. ' + 'Q and E change altitude, Shift moves faster.',
+      },
+      { term: [kbd('R')], desc: 'Jump to a random notable card.' },
+      { term: [kbd('F')], desc: 'Reframe the whole layout.' },
       { term: [kbd('Esc')], desc: 'Close the card panel.' },
     ]),
     el('p', { className: 'mcu-intro-body' }, [
       document.createTextNode(
         'Six layouts wait along the bottom edge, filters live on the left, visual settings sit top-right. ' +
-          'Fly in close on any star and its actual card art materialises around you.',
+          'Fly in close on any star and its actual card art materialises around you; ' +
+          'at middle distances the most-played cards label themselves.',
       ),
     ]),
   ]);
@@ -203,8 +210,33 @@ export function mountIntro(root: HTMLElement, universe: Universe): IntroHandle {
   const offBackdrop = listen(overlay, 'mousedown', (e) => {
     if (e.target === overlay) close();
   });
-  const offEscape = listen(window, 'keydown', (e) => {
-    if ((e as KeyboardEvent).key === 'Escape' && isOpen) close();
+
+  /** Focusable elements currently inside the panel, in DOM order. */
+  function focusable(): HTMLElement[] {
+    return [...panel.querySelectorAll<HTMLElement>('a[href], button, input, [tabindex]')].filter(
+      (el) => !el.hasAttribute('disabled') && el.tabIndex !== -1,
+    );
+  }
+
+  const offKeydown = listen(window, 'keydown', (e) => {
+    const ev = e as KeyboardEvent;
+    if (!isOpen) return;
+    if (ev.key === 'Escape') {
+      close();
+      return;
+    }
+    // Trap Tab focus inside the panel while it is open — the galaxy behind
+    // it is still visible and hoverable but must not be reachable by Tab.
+    if (ev.key !== 'Tab') return;
+    const items = focusable();
+    if (items.length === 0) return;
+    const first = items[0]!;
+    const last = items[items.length - 1]!;
+    const active = document.activeElement;
+    if (ev.shiftKey ? active === first || !panel.contains(active) : active === last) {
+      ev.preventDefault();
+      (ev.shiftKey ? last : first).focus();
+    }
   });
 
   return {
@@ -213,7 +245,7 @@ export function mountIntro(root: HTMLElement, universe: Universe): IntroHandle {
       offReady();
       offEnter();
       offBackdrop();
-      offEscape();
+      offKeydown();
       if (isOpen) store.patchVisual({ autoRotate: false });
       overlay.remove();
     },

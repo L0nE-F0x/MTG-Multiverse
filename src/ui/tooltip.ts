@@ -5,7 +5,8 @@
  */
 import { store } from '../core/store.ts';
 import type { Universe } from '../data/universe.ts';
-import { el } from './dom.ts';
+import { capitalize, el } from './dom.ts';
+import { rarityColor } from './theme.ts';
 import '../styles/tooltip.css';
 
 export interface TooltipHandle {
@@ -15,8 +16,15 @@ export interface TooltipHandle {
 
 export function mountTooltip(root: HTMLElement, universe: Universe): TooltipHandle {
   const nameEl = el('span', { className: 'mcu-tooltip-name' });
+  const rarityEl = el('span', { className: 'mcu-tooltip-rarity' });
   const setEl = el('span', { className: 'mcu-tooltip-set' });
-  const tip = el('div', { className: 'mcu-tooltip' }, [nameEl, setEl]);
+  const yearEl = el('span', { className: 'mcu-tooltip-year' });
+  const mvEl = el('span', { className: 'mcu-tooltip-mv' });
+  const metaRow = el('div', { className: 'mcu-tooltip-meta' }, [setEl, yearEl, mvEl]);
+  const tip = el('div', { className: 'mcu-tooltip' }, [
+    rarityEl,
+    el('div', { className: 'mcu-tooltip-body' }, [nameEl, metaRow]),
+  ]);
   root.append(tip);
 
   let anchor: { x: number; y: number } | null = null;
@@ -37,8 +45,15 @@ export function mountTooltip(root: HTMLElement, universe: Universe): TooltipHand
       tip.classList.remove('mcu-tooltip--visible');
       return;
     }
+    const rarity = universe.rarityName(hovered);
     nameEl.textContent = universe.name(hovered);
+    rarityEl.textContent = capitalize(rarity)[0] ?? '';
+    rarityEl.title = capitalize(rarity);
+    rarityEl.style.setProperty('--rarity-color', rarityColor(rarity));
     setEl.textContent = universe.set(hovered).code.toUpperCase();
+    yearEl.textContent = String(universe.released(hovered).getUTCFullYear());
+    const mv = universe.col.cmc[hovered];
+    mvEl.textContent = mv === 255 ? '—' : `MV ${mv}`;
     tip.classList.add('mcu-tooltip--visible');
   }
   paint(store.state.hovered);

@@ -110,5 +110,8 @@
 }
 
 @media (max-width: 900px) {
-  .mcu-search { top: 66px; width: 92vw; }
+  .mcu-search { top: var(--mcu-mobile-search-top); width: 92vw; }
+  /* 16px stops iOS Safari auto-zooming the page on focus. */
+  .mcu-search-input { font-size: 16px; min-height: var(--mcu-touch); }
+  .mcu-search-row { padding: 12px 14px; min-height: var(--mcu-touch); }
 }

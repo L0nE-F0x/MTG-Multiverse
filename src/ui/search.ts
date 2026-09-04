@@ -14,17 +14,30 @@ export interface SearchHandle {
 }
 
 export function mountSearch(root: HTMLElement, universe: Universe): SearchHandle {
+  // The full hint crowds out at phone widths (and the 16px font a touch
+  // input needs, to stop iOS auto-zooming on focus, makes it worse) —
+  // drop the keybinding hint there, the search icon still reads as search.
+  const placeholder = window.matchMedia('(max-width: 420px)').matches
+    ? `Search ${universe.count.toLocaleString()} cards…`
+    : `Search ${universe.count.toLocaleString()} cards…  (/ or Ctrl+K)`;
   const input = el('input', {
     className: 'mcu-search-input',
     attrs: {
       type: 'text',
-      placeholder: `Search ${universe.count.toLocaleString()} cards…  (/ or Ctrl+K)`,
+      placeholder,
       autocomplete: 'off',
       spellcheck: 'false',
       'aria-label': 'Search cards',
+      role: 'combobox',
+      'aria-expanded': 'false',
+      'aria-autocomplete': 'list',
+      'aria-controls': 'mcu-search-listbox',
     },
   });
-  const list = el('div', { className: 'mcu-search-results', attrs: { role: 'listbox' } });
+  const list = el('div', {
+    className: 'mcu-search-results',
+    attrs: { role: 'listbox', id: 'mcu-search-listbox' },
+  });
   const wrap = el('div', { className: 'mcu-search' }, [
     el('div', { className: 'mcu-search-icon' }),
     input,
@@ -36,15 +49,29 @@ export function mountSearch(root: HTMLElement, universe: Universe): SearchHandle
 
   function setOpen(open: boolean): void {
     wrap.classList.toggle('mcu-search--open', open);
-    if (!open) active = -1;
+    input.setAttribute('aria-expanded', String(open));
+    if (!open) {
+      active = -1;
+      input.removeAttribute('aria-activedescendant');
+    }
   }
 
   function setActive(k: number): void {
     active = k;
     const rows = list.children;
-    for (let i = 0; i < rows.length; i++) rows[i]?.classList.toggle('mcu-search-row--active', i === k);
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (!(row instanceof HTMLElement)) continue;
+      row.classList.toggle('mcu-search-row--active', i === k);
+      row.setAttribute('aria-selected', String(i === k));
+    }
     const row = rows[k];
-    if (row instanceof HTMLElement) row.scrollIntoView({ block: 'nearest' });
+    if (row instanceof HTMLElement) {
+      row.scrollIntoView({ block: 'nearest' });
+      input.setAttribute('aria-activedescendant', row.id);
+    } else {
+      input.removeAttribute('aria-activedescendant');
+    }
   }
 
   function select(k: number): void {
@@ -71,15 +98,22 @@ export function mountSearch(root: HTMLElement, universe: Universe): SearchHandle
         pip.style.setProperty('--pip-color', MANA_COLOR_HEX[c] ?? '#888');
         pips.append(pip);
       }
-      const row = el('div', { className: 'mcu-search-row', attrs: { role: 'option' } }, [
-        el('span', { className: 'mcu-search-name', text: universe.name(idx) }),
-        el('span', { className: 'mcu-search-set', text: universe.set(idx).code.toUpperCase() }),
-        el('span', {
-          className: 'mcu-search-year',
-          text: String(universe.released(idx).getUTCFullYear()),
-        }),
-        pips,
-      ]);
+      const row = el(
+        'div',
+        {
+          className: 'mcu-search-row',
+          attrs: { role: 'option', id: `mcu-search-row-${k}`, 'aria-selected': 'false' },
+        },
+        [
+          el('span', { className: 'mcu-search-name', text: universe.name(idx) }),
+          el('span', { className: 'mcu-search-set', text: universe.set(idx).code.toUpperCase() }),
+          el('span', {
+            className: 'mcu-search-year',
+            text: String(universe.released(idx).getUTCFullYear()),
+          }),
+          pips,
+        ],
+      );
       row.addEventListener('mousedown', (e) => {
         e.preventDefault();
         select(k);

@@ -100,8 +100,20 @@ export function mountSettings(root: HTMLElement): SettingsHandle {
     el('div', { className: 'mcu-corner mcu-corner--br' }),
     body,
   ]);
-  const toggle = el('button', { className: 'mcu-settings-toggle', text: 'SETTINGS', attrs: { type: 'button' } });
-  toggle.addEventListener('click', () => panel.classList.toggle('mcu-settings--open'));
+  panel.id = 'mcu-settings-panel';
+  const toggle = el('button', {
+    className: 'mcu-settings-toggle',
+    text: 'SETTINGS',
+    attrs: {
+      type: 'button',
+      'aria-expanded': 'false',
+      'aria-controls': 'mcu-settings-panel',
+    },
+  });
+  toggle.addEventListener('click', () => {
+    const open = panel.classList.toggle('mcu-settings--open');
+    toggle.setAttribute('aria-expanded', String(open));
+  });
 
   root.append(toggle, panel);
 

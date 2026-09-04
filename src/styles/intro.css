@@ -163,11 +163,15 @@
   /* Near-opaque, NOT var(--mcu-panel-bg): that token is 0.78 alpha, so the
      controls list scrolled straight through the CTA and the two overlapped
      illegibly. The panel around it is already frosted, so a solid footer reads
-     correctly here. */
+     correctly here. Solid until 78% and only fading in the last sliver —
+     on short/mobile viewports the "Controls" list is taller than the
+     visible area above the footer, and the old 58% stop left enough of a
+     translucent band at the top of the footer for that list to bleed
+     through behind the CTA button. */
   background: linear-gradient(
     to top,
-    rgba(8, 10, 20, 0.985) 0%,
-    rgba(8, 10, 20, 0.96) 58%,
+    rgba(8, 10, 20, 0.99) 0%,
+    rgba(8, 10, 20, 0.99) 78%,
     rgba(8, 10, 20, 0) 100%
   );
 }

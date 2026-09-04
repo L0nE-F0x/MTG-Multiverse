@@ -22,12 +22,12 @@ const CLICK_SLOP_PX = 5;
  * rather than the first.
  */
 const QUALITY_LEVELS = [
-  { nebulaScale: 0.18, steps: 20, renderScale: 0.70 },
-  { nebulaScale: 0.22, steps: 24, renderScale: 0.82 },
-  { nebulaScale: 0.26, steps: 28, renderScale: 0.92 },
-  { nebulaScale: 0.32, steps: 34, renderScale: 1.0 },
-  { nebulaScale: 0.42, steps: 44, renderScale: 1.0 },
-  { nebulaScale: 0.50, steps: 52, renderScale: 1.0 },
+  { nebulaScale: 0.24, steps: 24, renderScale: 0.78 },
+  { nebulaScale: 0.28, steps: 28, renderScale: 0.88 },
+  { nebulaScale: 0.34, steps: 32, renderScale: 0.95 },
+  { nebulaScale: 0.40, steps: 38, renderScale: 1.0 },
+  { nebulaScale: 0.46, steps: 46, renderScale: 1.0 },
+  { nebulaScale: 0.52, steps: 54, renderScale: 1.0 },
 ];
 const TOP_TIER = QUALITY_LEVELS.length - 1;
 
@@ -61,6 +61,9 @@ export class App {
   private running = false;
   private pointerDown = { x: 0, y: 0, t: 0 };
   private pointerInside = false;
+  private lastPointer = { x: 0, y: 0 };
+  /** Camera pose at the last pick, so motion can re-arm one. */
+  private lastPickPose = '';
   private frames = 0;
   private fpsAccum = 0;
   private filterQueued = false;
@@ -150,7 +153,8 @@ export class App {
     add<PointerEvent>(this.canvas, 'pointermove', (e) => {
       this.pointerInside = true;
       const r = this.canvas.getBoundingClientRect();
-      this.picker.request(e.clientX - r.left, e.clientY - r.top);
+      this.lastPointer = { x: e.clientX - r.left, y: e.clientY - r.top };
+      this.picker.request(this.lastPointer.x, this.lastPointer.y);
     });
 
     add<PointerEvent>(this.canvas, 'pointerleave', () => {
@@ -267,15 +271,30 @@ export class App {
       return;
     }
     const mode = store.state.layout;
-    const strength = mode === 'galaxy' ? 1 : mode === 'price' ? 0.8 : 0.09;
-    this.nebula.setDensity(strength);
-    this.coreGlow.setStrength(mode === 'galaxy' ? 1 : mode === 'price' ? 0.55 : 0);
+    const layout = mode === 'galaxy' ? 1 : mode === 'price' ? 0.8 : 0.09;
+
+    // Linear in the visible fraction, with a floor so a narrow filter still
+    // leaves the galaxy's shape faintly legible rather than cutting to black.
+    const fraction = this.universe.count > 0
+      ? store.state.matchCount / this.universe.count
+      : 1;
+    const populated = 0.12 + 0.88 * fraction;
+
+    this.nebula.setDensity(layout * populated);
+    this.coreGlow.setStrength(
+      (mode === 'galaxy' ? 1 : mode === 'price' ? 0.55 : 0) * populated,
+    );
   }
 
   private applyFilter(): void {
     const count = this.universe.applyFilter(store.state.filter, this.mask);
     this.starfield.setVisibility(this.mask);
     store.set('matchCount', count);
+    // The gas stands for the population, so it has to thin with it. Leaving it
+    // at full strength made filtering look broken: the stars dimmed correctly
+    // but the nebula kept painting the same bright five-armed galaxy over them,
+    // so narrowing 117k cards down to 13k changed almost nothing on screen.
+    this.applyNebulaDensity();
   }
 
   private applyVisual(v: VisualState): void {
@@ -335,6 +354,17 @@ export class App {
 
     this.nebula.render(this.renderer, this.camera, time);
     this.post.composer.render(dt);
+
+    // Re-pick when the camera moves, not only when the pointer does. The star
+    // under a stationary cursor genuinely changes as you orbit, and this also
+    // gives a dropped readback a natural second chance.
+    if (this.pointerInside) {
+      const pose = `${this.rig.distance.toFixed(1)}|${this.rig.target.x.toFixed(1)},${this.rig.target.y.toFixed(1)},${this.rig.target.z.toFixed(1)}|${this.camera.position.x.toFixed(1)},${this.camera.position.y.toFixed(1)},${this.camera.position.z.toFixed(1)}`;
+      if (pose !== this.lastPickPose) {
+        this.lastPickPose = pose;
+        this.picker.request(this.lastPointer.x, this.lastPointer.y);
+      }
+    }
 
     this.picker.poll(this.renderer, this.camera, (index) => {
       const valid = index >= 0 && index < this.universe.count && this.pointerInside;

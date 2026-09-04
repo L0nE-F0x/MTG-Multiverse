@@ -35,12 +35,16 @@ export function mountHud(root: HTMLElement, universe: Universe, onAbout: () => v
       el('div', { className: 'mcu-wordmark', text: 'MAGIC CARD UNIVERSE' }),
       aboutBtn,
     ]),
-    el('div', { className: 'mcu-command-count' }, [
-      countN,
-      document.createTextNode(' of '),
-      el('span', { className: 'mcu-command-count-total', text: fmtInt(universe.count) }),
-      document.createTextNode(' stars visible'),
-    ]),
+    el(
+      'div',
+      { className: 'mcu-command-count', attrs: { 'aria-live': 'polite', 'aria-atomic': 'true' } },
+      [
+        countN,
+        document.createTextNode(' of '),
+        el('span', { className: 'mcu-command-count-total', text: fmtInt(universe.count) }),
+        document.createTextNode(' stars visible'),
+      ],
+    ),
   ]);
   root.append(commandBar);
 
@@ -53,12 +57,15 @@ export function mountHud(root: HTMLElement, universe: Universe, onAbout: () => v
   // ---- Layout switcher ------------------------------------------------
   const descEl = el('div', { className: 'mcu-layout-desc' });
   const buttons = new Map<LayoutMode, HTMLButtonElement>();
-  const segmented = el('div', { className: 'mcu-layout-segmented' });
-  for (const { mode, label } of LAYOUTS) {
+  const segmented = el('div', {
+    className: 'mcu-layout-segmented',
+    attrs: { role: 'group', 'aria-label': 'Layout mode' },
+  });
+  for (const { mode, label, desc } of LAYOUTS) {
     const btn = el('button', {
       className: 'mcu-layout-btn',
       text: label,
-      attrs: { type: 'button' },
+      attrs: { type: 'button', 'aria-pressed': 'false', 'aria-label': `${label} layout — ${desc}` },
     });
     btn.addEventListener('click', () => store.set('layout', mode));
     buttons.set(mode, btn);
@@ -70,7 +77,11 @@ export function mountHud(root: HTMLElement, universe: Universe, onAbout: () => v
 
   function paintLayout(): void {
     const current = store.state.layout;
-    for (const [mode, btn] of buttons) btn.classList.toggle('mcu-layout-btn--active', mode === current);
+    for (const [mode, btn] of buttons) {
+      const active = mode === current;
+      btn.classList.toggle('mcu-layout-btn--active', active);
+      btn.setAttribute('aria-pressed', String(active));
+    }
     descEl.textContent = LAYOUTS.find((l) => l.mode === current)?.desc ?? '';
   }
   paintLayout();

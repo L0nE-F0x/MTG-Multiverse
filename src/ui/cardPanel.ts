@@ -7,7 +7,7 @@
 import { store } from '../core/store.ts';
 import { FORMAT_BIT } from '../data/format.ts';
 import type { Universe } from '../data/universe.ts';
-import { capitalize, el, listen } from './dom.ts';
+import { capitalize, el, fmtInt, listen } from './dom.ts';
 import { MANA_COLOR_HEX } from './theme.ts';
 import '../styles/cardPanel.css';
 
@@ -71,18 +71,66 @@ function buildImage(universe: Universe, i: number): { frame: HTMLElement; cleanu
   return { frame, cleanup };
 }
 
+/** Chips shown before the "show all" affordance appears. */
+const PRINTINGS_CAP = 16;
+
+function printingChip(universe: Universe, p: number, isCurrent: boolean): HTMLButtonElement {
+  const setInfo = universe.set(p);
+  const year = universe.released(p).getUTCFullYear();
+  const chip = el(
+    'button',
+    {
+      className: isCurrent ? 'mcu-printing-chip mcu-printing-chip--current' : 'mcu-printing-chip',
+      attrs: {
+        type: 'button',
+        title: `${setInfo.name} (${year})${isCurrent ? ' — currently viewing' : ''}`,
+        ...(isCurrent ? { 'aria-current': 'true' } : {}),
+      },
+    },
+    [
+      document.createTextNode(setInfo.code.toUpperCase()),
+      el('span', { className: 'mcu-printing-chip-year', text: String(year) }),
+    ],
+  );
+  chip.addEventListener('click', () => store.set('selected', p));
+  return chip;
+}
+
+/**
+ * "Every printing" strip, oldest first. A card can have 50+ printings
+ * (Lightning Bolt-class staples), so the strip renders a capped window by
+ * default with a "show all" chip to reveal the rest — the current printing
+ * is always kept visible even when it falls outside that initial window.
+ */
 function buildPrintings(universe: Universe, i: number): HTMLElement {
+  const printings = universe.printingsOf(i);
   const strip = el('div', { className: 'mcu-printings-strip' });
-  for (const p of universe.printingsOf(i)) {
-    const chip = el('button', {
-      className: 'mcu-printing-chip',
-      text: universe.set(p).code.toUpperCase(),
-      attrs: { type: 'button', title: universe.set(p).name },
-    });
-    if (p === i) chip.classList.add('mcu-printing-chip--current');
-    chip.addEventListener('click', () => store.set('selected', p));
-    strip.append(chip);
+
+  function renderChips(list: number[]): void {
+    strip.innerHTML = '';
+    for (const p of list) strip.append(printingChip(universe, p, p === i));
   }
+
+  if (printings.length <= PRINTINGS_CAP) {
+    renderChips(printings);
+    return strip;
+  }
+
+  const currentPos = printings.indexOf(i);
+  const collapsed =
+    currentPos < PRINTINGS_CAP ? printings.slice(0, PRINTINGS_CAP) : [...printings.slice(0, PRINTINGS_CAP - 1), i];
+  const hidden = printings.length - collapsed.length;
+
+  renderChips(collapsed);
+  const moreBtn = el('button', {
+    className: 'mcu-printing-more',
+    text: `+${hidden} more`,
+    attrs: { type: 'button', 'aria-label': `Show all ${printings.length} printings` },
+  });
+  moreBtn.addEventListener('click', () => {
+    renderChips(printings);
+  });
+  strip.append(moreBtn);
   return strip;
 }
 
@@ -113,7 +161,10 @@ async function fetchScryfall(universe: Universe, i: number, onData: (c: Scryfall
 }
 
 export function mountCardPanel(root: HTMLElement, universe: Universe): CardPanelHandle {
-  const panel = el('aside', { className: 'mcu-card-panel mcu-glass-panel' });
+  const panel = el('aside', {
+    className: 'mcu-card-panel mcu-glass-panel',
+    attrs: { 'aria-label': 'Card details' },
+  });
   root.append(panel);
 
   let cleanupTilt: (() => void) | null = null;
@@ -187,7 +238,12 @@ export function mountCardPanel(root: HTMLElement, universe: Universe): CardPanel
     const oracleBox = el('div', { className: 'mcu-card-oracle mcu-card-oracle--loading' });
     infoRows.append(oracleBox);
 
+    const printings = universe.printingsOf(i);
     const printStrip = buildPrintings(universe, i);
+    const printHeading = el('h3', { className: 'mcu-panel-heading' }, [
+      document.createTextNode('Every printing'),
+      el('span', { className: 'mcu-panel-heading-count', text: fmtInt(printings.length) }),
+    ]);
     const link = el('a', {
       className: 'mcu-card-link',
       text: 'View on Scryfall ↗',
@@ -200,7 +256,7 @@ export function mountCardPanel(root: HTMLElement, universe: Universe): CardPanel
       el('div', { className: 'mcu-corner mcu-corner--br' }),
       imgFrame,
       infoRows,
-      el('h3', { className: 'mcu-panel-heading', text: 'Every printing' }),
+      printHeading,
       printStrip,
       link,
     );
