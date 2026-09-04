@@ -28,7 +28,8 @@
   position: fixed;
   top: 66px;
   right: 20px;
-  z-index: 24;
+  /* Above the title screen (z 90) so Settings from the landing is reachable. */
+  z-index: 96;
   width: 260px;
   max-height: calc(100vh - 100px);
   overflow-y: auto;

@@ -98,12 +98,9 @@ const browser = await puppeteer.launch({
 try {
   const page = await browser.newPage();
   await page.setViewport({ width: WIDTH, height: HEIGHT, deviceScaleFactor: 1 });
-  await page.evaluateOnNewDocument(() => {
-    try { localStorage.setItem('mcu.introSeen', '1'); } catch { /* private mode */ }
-  });
-
   await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.waitForFunction('window.__mcu !== undefined', { timeout: 120000, polling: 250 });
+  await page.evaluate(() => window.__mcu.ui && window.__mcu.ui.enter());
   await sleep(2000);
 
   const renderer = await page.evaluate(() => {

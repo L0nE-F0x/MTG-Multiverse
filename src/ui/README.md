@@ -18,21 +18,31 @@ call. Reads/writes: none directly — it only composes the other modules.
 
 ## Components
 
-### `loading.ts` — `mountLoading(root)`
-Full-screen boot-sequence overlay.
-- Reads: `loadProgress`, `loadLabel`, `ready`.
-- Writes: none.
-- Fades out and unmounts itself once `ready` becomes `true` (or immediately
-  if it was already `true` at mount time).
+### `title.ts` — `mountTitle(root, universe, host)`
+Cinematic title screen shown after boot on **every** visit, and again from
+the HUD wordmark. The galaxy keeps turning behind a vignette (not a frosted
+wall). Three actions: Enter the Multiverse, Instructions, Settings. A tiny
+Wizards-of-the-Coast disclaimer sits at the bottom.
+- Reads: `shell`, `visual.autoRotate`.
+- Writes: `shell` (`title` / `play`), `visual.autoRotate` (on while the
+  title is up, restored on enter).
+- `host.toggleSettings` / `closeSettings` / `settingsOpen` are callbacks
+  into `settings.ts` so the landing Settings button can open the existing
+  panel without importing it.
+- Instructions is the previous intro content, now a separate overlay with
+  a Back button. The HUD "?" opens that overlay without leaving play.
+- Returns `{ open(), enter(), openHelp(), destroy() }`. `index.ts` also
+  exposes `enter` / `openTitle` / `openHelp` on `UIHandles` so the capture
+  harness can dismiss the title (`window.__mcu.ui.enter()`).
 
-### `hud.ts` — `mountHud(root, universe, onAbout)`
+### `hud.ts` — `mountHud(root, universe, hooks)`
 Top-left wordmark + live match count, a small "?" About control next to the
 wordmark, and the bottom-centre layout-mode segmented control.
 - Reads: `matchCount`, `layout`.
 - Writes: `layout` (via `store.set('layout', mode)` on click).
 - `universe.count` supplies the fixed "of N stars" denominator.
-- `onAbout` is called on click of the "?" control; `index.ts` wires it to
-  `intro.open()` so the landing overlay is always reachable again.
+- `hooks.onHome` is the wordmark click (return to the title screen);
+  `hooks.onHelp` is the "?" control (instructions overlay).
 - The layout buttons carry `aria-pressed` reflecting `store.state.layout`;
   the match-count line has `aria-live="polite"` so screen readers announce
   it as filters narrow the result. Below 900px the segmented control is
@@ -41,33 +51,6 @@ wordmark, and the bottom-centre layout-mode segmented control.
   compresses — wrapping its own label text — to stay on one row at
   phone widths while still hitting the 44px touch-target height.
 
-### `intro.ts` — `mountIntro(root, universe)`
-Landing / introduction overlay: three sections ("What this is", "How to
-read it", "Controls") over a frosted glass panel, with the galaxy still
-visible (and slowly turning) behind it.
-- Reads: `ready` (subscribes via `store.on('ready', ...)`, and also checks
-  `store.state.ready` at mount time in case it is already `true`).
-- Writes: `visual.autoRotate` (`store.patchVisual`) — `true` while open,
-  restored to `false` on close.
-- Opens automatically the first time `ready` flips `true`, unless
-  `localStorage['mcu.introSeen']` is already `'1'` (every localStorage
-  access is wrapped in try/catch — it can throw in some privacy modes).
-  Dismissing by any route (the "Enter the universe" button, a backdrop
-  click, or `Esc`) sets that key so returning visitors skip straight in.
-- Returns `{ open(), destroy() }` on its handle; `open()` is how the HUD's
-  "?" control reopens it later. The overlay's DOM and listeners are created
-  once at mount and only toggled via a CSS class, so open/close/reopen never
-  leaks listeners.
-- Traps `Tab`/`Shift+Tab` focus inside the panel while open (a single
-  `keydown` listener re-derives the focusable set on every press rather than
-  caching it, since the panel's content never actually changes but this
-  keeps the trap correct if it ever does), and restores focus to whatever
-  was focused before `open()` was called once it closes.
-- `universe.count` supplies the live card count in section 1 (via `fmtInt`).
-- Respects `prefers-reduced-motion` through the shared `.mcu-root` rule in
-  `base.css`; entrance stagger and the dismiss fade/scale both use
-  `var(--mcu-ease)`.
-
 ### `search.ts` — `mountSearch(root, universe)`
 Top-centre search box with a keyboard-navigable results dropdown.
 - Reads: `results` (to render the dropdown).
@@ -75,7 +58,8 @@ Top-centre search box with a keyboard-navigable results dropdown.
   `filter.query` (`store.patchFilter`), `selected` (`store.set`, on
   choosing a result).
 - Debounces input 120ms. `/` or Ctrl+K focuses the box from anywhere
-  (skipped while another field has focus). ArrowUp/ArrowDown moves the
+  (skipped while another field has focus, and while `store.state.shell`
+  is `title`). ArrowUp/ArrowDown moves the
   active row, Enter selects it, Escape clears the query and closes the
   dropdown. Closes on outside click.
 - The input is a `role="combobox"` wired to the results list
@@ -167,10 +151,11 @@ Collapsible top-right visual settings panel.
 - Reads: `stats` (fps + visible/total) for the telemetry readout at the
   bottom of the panel. Writes: none for telemetry.
 - The `SETTINGS` toggle carries `aria-expanded`/`aria-controls` reflecting
-  the panel's open state. Below 900px width the panel is inset from the
-  top/bottom chrome the same way the filters and card-panel drawers are
-  (see their notes above) instead of the old `top:66px` that let it render
-  underneath the search bar.
+  the panel's open state. The handle also exposes `open()` / `close()` /
+  `toggle()` / `isOpen()` so the title screen can open the same panel.
+  Below 900px width the panel is inset from the top/bottom chrome the same
+  way the filters and card-panel drawers are (see their notes above)
+  instead of the old `top:66px` that let it render underneath the search bar.
 
 ## Shared helpers
 
@@ -179,6 +164,11 @@ Collapsible top-right visual settings panel.
 `el('input', …)` already comes back as `HTMLInputElement`), `debounce()`,
 `clamp()`, `fmtInt()`, `capitalize()`, `listen()` (an `addEventListener`
 that returns its own cleanup function). No store access.
+
+### `brand.ts`
+`BRAND`, `BRAND_WORDMARK`, `BRAND_TAGLINE` and `DISCLAIMER` — the
+user-facing name, used by the title screen, HUD and (via copy) the HTML
+boot overlay.
 
 ### `theme.ts`
 `MANA_COLOR_HEX` (the five WUBRG colours) and `RARITY_COLOR_HEX` /
@@ -199,8 +189,10 @@ One file per component, each imported directly by its module
   one), and a `max-width: 900px` pass that grows shared chip/segmented/
   checkbox chrome to a real `--mcu-touch` (44px) hit area on phone-width
   viewports.
-- `loading.css`, `hud.css`, `search.css`, `filters.css`, `cardPanel.css`,
-  `tooltip.css`, `settings.css`, `intro.css` — one per component above.
+- `title.css`, `intro.css` (the instructions overlay), `hud.css`,
+  `search.css`, `filters.css`, `cardPanel.css`, `tooltip.css`,
+  `settings.css` — one per component above. The HTML `#boot` overlay in
+  `index.html` is the loading screen; it is not a UI-layer module.
   Each component-specific `max-width: 900px` block handles its own
   touch-target sizing beyond the shared chrome, and — for the filters
   panel, card panel and settings panel — insets the drawer from the fixed

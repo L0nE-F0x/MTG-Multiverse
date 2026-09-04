@@ -32,6 +32,23 @@ function check(name, ok, detail = '') {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** Click a visible title-screen button whose label matches `re`. */
+async function clickLabeledButton(page, re) {
+  return page.evaluate((pattern) => {
+    const rx = new RegExp(pattern, 'i');
+    const b = [...document.querySelectorAll('button')].find((el) => {
+      if (!rx.test(el.textContent ?? '')) return false;
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return false;
+      if (getComputedStyle(el).visibility === 'hidden') return false;
+      return true;
+    });
+    if (!b) return false;
+    b.click();
+    return true;
+  }, re);
+}
+
 /**
  * Wait until the camera stops moving, rather than sleeping a fixed amount.
  * Flights are spring-damped and the opening approach is deliberately slow, so
@@ -84,12 +101,6 @@ try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1600, height: 1000, deviceScaleFactor: 1 });
 
-  // Suppress the intro overlay before any page script runs; setting the flag
-  // after load is too late, since the overlay opens as soon as `ready` flips.
-  await page.evaluateOnNewDocument(() => {
-    try { localStorage.setItem('mcu.introSeen', '1'); } catch { /* private mode */ }
-  });
-
   const pageErrors = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
 
@@ -101,25 +112,70 @@ try {
   const count = await page.evaluate(() => window.__mcu.universe.count);
   check('universe loaded', count > 100000, `${count.toLocaleString()} cards`);
 
-  // Belt and braces: if an overlay is somehow still up, dismiss it so it cannot
-  // swallow the pointer events the rest of this test depends on.
-  const introDismissed = await page.evaluate(() => {
-    let clicked = false;
-    document.querySelectorAll('button').forEach((b) => {
-      if (!/enter the universe/i.test(b.textContent ?? '')) return;
-      // The overlay is built once and toggled by class, so the button exists
-      // even when closed. Only treat it as open if it is actually rendered,
-      // otherwise this reports a dismissal that never needed to happen.
-      const rect = b.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return;
-      if (getComputedStyle(b).visibility === 'hidden') return;
-      b.click();
-      clicked = true;
-    });
-    return clicked;
+  const title = await page.evaluate(() => {
+    const overlay = document.querySelector('.mcu-title');
+    const labels = [...document.querySelectorAll('.mcu-title button')]
+      .filter((b) => {
+        const r = b.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== 'hidden';
+      })
+      .map((b) => (b.textContent ?? '').trim());
+    const hud = document.querySelector('.mcu-command-bar');
+    return {
+      open: !!overlay?.classList.contains('mcu-title--open'),
+      labels,
+      hudHidden: !hud || getComputedStyle(hud).visibility === 'hidden',
+      disclaimer: (document.querySelector('.mcu-title-disclaimer')?.textContent ?? '').length > 40,
+    };
   });
-  if (introDismissed) console.log('  note: intro overlay was open and has been dismissed');
-  await sleep(900);
+  check('title screen is open after load', title.open);
+  check('title offers Enter, Instructions and Settings',
+    title.labels.includes('Enter the Multiverse') &&
+    title.labels.includes('Instructions') &&
+    title.labels.includes('Settings'),
+    title.labels.join(' | '));
+  check('play chrome is hidden on the title screen', title.hudHidden);
+  check('title screen carries the Wizards disclaimer', title.disclaimer);
+
+  check('Instructions opens the help overlay', await clickLabeledButton(page, '^\\s*Instructions\\s*$'));
+  await sleep(400);
+  check('help overlay is visible', await page.evaluate(() =>
+    !!document.querySelector('.mcu-intro--open')));
+  check('Back closes the help overlay', await clickLabeledButton(page, '^\\s*Back\\s*$'));
+  await sleep(400);
+  check('help overlay closed', await page.evaluate(() =>
+    !document.querySelector('.mcu-intro--open')));
+
+  check('Settings opens the settings panel', await clickLabeledButton(page, '^\\s*Settings\\s*$'));
+  await sleep(300);
+  check('settings panel is open from the title screen', await page.evaluate(() =>
+    !!document.querySelector('.mcu-settings--open')));
+  await clickLabeledButton(page, '^\\s*Settings\\s*$');
+  await sleep(300);
+
+  check('Enter the Multiverse dismisses the title', await clickLabeledButton(page, 'enter the multiverse'));
+  await sleep(700);
+  const afterEnter = await page.evaluate(() => {
+    const overlay = document.querySelector('.mcu-title');
+    const hud = document.querySelector('.mcu-command-bar');
+    return {
+      titleOpen: !!overlay?.classList.contains('mcu-title--open'),
+      hudVisible: !!hud && getComputedStyle(hud).visibility !== 'hidden',
+      shell: window.__mcu.store.state.shell,
+    };
+  });
+  check('title screen is closed after enter', !afterEnter.titleOpen);
+  check('HUD is visible after enter', afterEnter.hudVisible);
+  check('store.shell is play after enter', afterEnter.shell === 'play', `got "${afterEnter.shell}"`);
+
+  // Title auto-rotate leaves the heading wherever it drifted. Pin the default
+  // angle so the Black Lotus pick is not at the mercy of how long the menu sat.
+  await page.evaluate(() => {
+    const app = window.__mcu.app;
+    app.rig.setAngles(Math.PI * 0.25, app.starfield.framePhi());
+    app.resetView();
+  });
+  await settleCamera(page);
 
   // --- fly to a known card so it is centred and unoccluded -----------------
   const target = await page.evaluate(() => {
@@ -274,7 +330,11 @@ try {
     waitUntil: 'domcontentloaded', timeout: 30000,
   });
   await page.waitForFunction('window.__mcu !== undefined', { timeout: 120000, polling: 250 });
-  await sleep(2500);
+  await sleep(1500);
+
+  const titleReturned = await page.evaluate(() =>
+    !!document.querySelector('.mcu-title--open'));
+  check('title screen returns on every visit', titleReturned);
 
   const deep = await page.evaluate(() => {
     const s = window.__mcu.store.state;

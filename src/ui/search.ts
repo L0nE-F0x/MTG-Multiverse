@@ -158,6 +158,7 @@ export function mountSearch(root: HTMLElement, universe: Universe): SearchHandle
   });
 
   const offGlobalKey = listen(window, 'keydown', (e) => {
+    if (store.state.shell === 'title') return;
     const ev = e as KeyboardEvent;
     const target = ev.target as HTMLElement | null;
     const typing =

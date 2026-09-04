@@ -27,10 +27,19 @@
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.24em;
+  font-family: inherit;
+  appearance: none;
   background: linear-gradient(120deg, var(--mcu-cyan), var(--mcu-violet));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.mcu-wordmark:hover {
+  filter: drop-shadow(0 0 8px rgba(94, 231, 255, 0.45));
 }
 .mcu-about-btn {
   flex: 0 0 auto;

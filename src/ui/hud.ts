@@ -5,11 +5,19 @@
 import { store } from '../core/store.ts';
 import type { LayoutMode } from '../core/store.ts';
 import type { Universe } from '../data/universe.ts';
+import { BRAND, BRAND_WORDMARK } from './brand.ts';
 import { el, fmtInt } from './dom.ts';
 import '../styles/hud.css';
 
 export interface HudHandle {
   destroy(): void;
+}
+
+export interface HudHooks {
+  /** Wordmark click — return to the title screen. */
+  onHome(): void;
+  /** "?" click — open the instructions overlay. */
+  onHelp(): void;
 }
 
 const LAYOUTS: { mode: LayoutMode; label: string; desc: string }[] = [
@@ -21,18 +29,24 @@ const LAYOUTS: { mode: LayoutMode; label: string; desc: string }[] = [
   { mode: 'price', label: 'Price', desc: 'Value landscape' },
 ];
 
-export function mountHud(root: HTMLElement, universe: Universe, onAbout: () => void): HudHandle {
+export function mountHud(root: HTMLElement, universe: Universe, hooks: HudHooks): HudHandle {
   // ---- Command bar --------------------------------------------------
   const countN = el('span', { className: 'mcu-command-count-n' });
   const aboutBtn = el('button', {
     className: 'mcu-about-btn',
     text: '?',
-    attrs: { type: 'button', 'aria-label': 'About Magic Card Universe' },
+    attrs: { type: 'button', 'aria-label': `How to read ${BRAND}` },
   });
-  aboutBtn.addEventListener('click', onAbout);
+  aboutBtn.addEventListener('click', hooks.onHelp);
+  const wordmark = el('button', {
+    className: 'mcu-wordmark',
+    text: BRAND_WORDMARK,
+    attrs: { type: 'button', 'aria-label': `${BRAND}, return to title` },
+  });
+  wordmark.addEventListener('click', hooks.onHome);
   const commandBar = el('div', { className: 'mcu-command-bar' }, [
     el('div', { className: 'mcu-command-bar-top' }, [
-      el('div', { className: 'mcu-wordmark', text: 'MAGIC CARD UNIVERSE' }),
+      wordmark,
       aboutBtn,
     ]),
     el(

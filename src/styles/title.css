@@ -1,0 +1,236 @@
+/*
+ * Cinematic title screen. The galaxy is the hero — a vignette, not a
+ * frosted wall — with the wordmark and three actions floating over it.
+ */
+
+.mcu-title {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 700ms var(--mcu-ease), visibility 0s 700ms;
+}
+.mcu-title--open {
+  pointer-events: auto;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 560ms var(--mcu-ease), visibility 0s;
+}
+
+.mcu-title-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(5, 6, 13, 0.08) 0%, rgba(5, 6, 13, 0.42) 58%, rgba(5, 6, 13, 0.78) 100%),
+    linear-gradient(to top, rgba(5, 6, 13, 0.72) 0%, rgba(5, 6, 13, 0) 28%);
+}
+
+.mcu-title-center {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(560px, calc(100% - 40px));
+  transform: translateY(12px);
+  opacity: 0;
+  transition: transform 700ms var(--mcu-ease), opacity 600ms var(--mcu-ease);
+}
+.mcu-title-center::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 6%;
+  width: 150%;
+  height: 86%;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at 50% 48%, rgba(5, 6, 13, 0.8) 0%, rgba(5, 6, 13, 0.38) 44%, rgba(5, 6, 13, 0) 72%);
+  z-index: -1;
+  pointer-events: none;
+}
+.mcu-title--open .mcu-title-center {
+  transform: translateY(0);
+  opacity: 1;
+}
+.mcu-title--help .mcu-title-center,
+.mcu-title--help .mcu-title-disclaimer {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.mcu-title-mark {
+  width: 108px;
+  height: 108px;
+  margin-bottom: 18px;
+  filter: drop-shadow(0 0 18px rgba(94, 231, 255, 0.28));
+  animation: mcu-title-spin 80s linear infinite;
+  pointer-events: none;
+}
+
+.mcu-title-wordmark {
+  margin: 0;
+  text-align: center;
+  font-size: clamp(28px, 6vw, 52px);
+  font-weight: 300;
+  letter-spacing: 0.34em;
+  text-indent: 0.34em;
+  background: linear-gradient(120deg, #eaf4ff 0%, var(--mcu-cyan) 45%, var(--mcu-violet) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 28px rgba(94, 231, 255, 0.4));
+  animation: mcu-title-glow 3.6s ease-in-out infinite;
+}
+
+.mcu-title-pips {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+.mcu-title-pip {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.mcu-title-tagline {
+  margin: 16px 0 0;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.38em;
+  text-indent: 0.38em;
+  text-transform: uppercase;
+  color: var(--mcu-text-dim);
+  text-shadow: 0 0 16px rgba(5, 6, 13, 0.95), 0 1px 3px rgba(5, 6, 13, 0.9);
+}
+
+.mcu-title-count {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--mcu-cyan);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+  text-shadow: 0 0 16px rgba(5, 6, 13, 0.95);
+}
+
+.mcu-title-actions {
+  margin-top: 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  width: min(380px, 100%);
+}
+
+.mcu-title-enter {
+  pointer-events: auto;
+  cursor: pointer;
+  padding: 16px 28px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #06111a;
+  background: linear-gradient(135deg, var(--mcu-cyan), var(--mcu-violet));
+  border: none;
+  border-radius: 10px;
+  box-shadow: 0 0 28px rgba(94, 231, 255, 0.35), 0 8px 24px rgba(0, 0, 0, 0.4);
+  transition: transform 220ms var(--mcu-ease), box-shadow 220ms var(--mcu-ease);
+}
+.mcu-title-enter:hover {
+  transform: translateY(-2px) scale(1.015);
+  box-shadow: 0 0 36px rgba(94, 231, 255, 0.5), 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+.mcu-title-enter:active {
+  transform: translateY(0) scale(0.985);
+}
+
+.mcu-title-secondary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.mcu-title-btn {
+  pointer-events: auto;
+  cursor: pointer;
+  padding: 13px 16px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--mcu-text);
+  background: rgba(9, 11, 22, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--mcu-border-strong);
+  border-radius: 10px;
+  transition: color 180ms var(--mcu-ease), border-color 180ms var(--mcu-ease), box-shadow 180ms var(--mcu-ease);
+}
+.mcu-title-btn:hover,
+.mcu-title-btn[aria-expanded='true'] {
+  color: var(--mcu-cyan);
+  border-color: rgba(94, 231, 255, 0.45);
+  box-shadow: 0 0 16px rgba(94, 231, 255, 0.18);
+}
+
+.mcu-title-disclaimer {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 18px;
+  z-index: 1;
+  margin: 0 auto;
+  max-width: 62ch;
+  text-align: center;
+  font-size: 10px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  color: var(--mcu-text-faint);
+  opacity: 0.72;
+}
+
+@keyframes mcu-title-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes mcu-title-glow {
+  0%, 100% { filter: drop-shadow(0 0 18px rgba(94, 231, 255, 0.28)); }
+  50% { filter: drop-shadow(0 0 32px rgba(165, 107, 255, 0.5)); }
+}
+
+@media (max-width: 900px) {
+  .mcu-title-center { width: calc(100% - 32px); }
+  .mcu-title-mark { width: 84px; height: 84px; }
+  .mcu-title-wordmark { letter-spacing: 0.2em; text-indent: 0.2em; }
+  .mcu-title-actions { width: 100%; margin-top: 28px; }
+  .mcu-title-enter {
+    width: 100%;
+    padding: 18px 20px;
+    min-height: var(--mcu-touch);
+  }
+  .mcu-title-btn { min-height: var(--mcu-touch); }
+  .mcu-title-disclaimer {
+    bottom: 12px;
+    left: 16px;
+    right: 16px;
+    font-size: 9px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mcu-title-mark { animation: none; }
+  .mcu-title-wordmark { animation: none; }
+}

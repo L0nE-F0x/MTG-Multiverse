@@ -1,4 +1,4 @@
-# Magic Card Universe — handoff
+# Aetherfield — handoff
 
 **Read this first.** Live top-of-todo across model/agent handoffs.
 
@@ -13,24 +13,25 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 # ▶ START HERE — next session
 
-0. **2026-09-04, second pass.** The owner's standing instruction is a deep
-   polish pass ("keep going until it is completely and utterly perfect").
-   They interrupted once mid-session and immediately said to continue, so
-   treat autonomous polish as authorised until they say otherwise.
+0. **2026-09-04, Aetherfield shipped.** Rebrand + title screen on `main`.
+   Next slice is **filter polish** (and other in-galaxy fine detail).
 
    ### Git
 
    | | |
    |---|---|
-   | Latest | `3458aab` *Point the social tags at the canonical URL, not the branch deploy* |
-   | Branch | `main` == `origin/main`, working tree clean |
+   | Latest | this commit — *Rename to Aetherfield and add a title screen* |
+   | Branch | `main` |
    | Remote | https://github.com/L0nE-F0x/MTG-Multiverse |
 
-   ### State: everything green
+   CSS class prefix stays `mcu-`. Brand copy lives in `src/ui/brand.ts`.
+
+   ### State
 
    `npx tsc --noEmit` · `npx tsc -p tsconfig.tools.json --noEmit` ·
-   `npm run build` · `node tools/verify-universe.ts` ·
-   `npm run test:interaction` → **22/22**.
+   `npm run test:interaction` → **37/37**.
+
+   `npm run og` regenerated `public/og.jpg` as AETHERFIELD.
 
    **Picker: measured, understood, not fully eliminated.** An earlier
    claim in this file that the flake was "gone" was wrong — three clean
@@ -63,6 +64,18 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
    two of the six needing a second nudge.
 
    ### What shipped this pass (newest first)
+
+   - **Aetherfield.** Loading boot, title screen, HUD, OG, meta tags.
+     Title shows **every visit**. Three buttons: Enter the Multiverse,
+     Instructions, Settings. Tiny Wizards disclaimer at the bottom.
+     HUD wordmark returns home; "?" opens instructions without leaving
+     play. `store.shell` is `title` | `play` so WASD/`/` cannot fire
+     through the menu. Star labels are suppressed while `shell ===
+     'title'` (they are canvas-drawn, not DOM). Capture harness calls
+     `__mcu.ui.enter()` unless `--intro`.
+   - The HTML `#boot` overlay is the loader (five-arm mark + wordmark +
+     pips). The old JS `loading.ts` overlay is gone; it sat under `#boot`
+     and never showed.
 
    - **Printing thread.** Selecting a card draws a line through its
      printings in release order. Because angle is colour identity and
@@ -122,11 +135,10 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
   dead space. Do not "improve" this without looking at the output.
 - Default filter hides tokens and art cards, so the HUD reads
   `111,720 of 117,621` until that box is unchecked. Intentional.
-- On a phone the intro's Controls section is below the fold — the panel
-  scrolls and the CTA is sticky, which is normal, but a first-time mobile
-  visitor sees only "What this is" and "How to read it" without scrolling.
-  Left alone deliberately; shortening it further would cost the desktop
-  reading.
+- On a phone the Instructions panel's Controls section is below the
+  fold. First-time visitors now see the title screen instead, so this is
+  even less of a first-run problem. Left alone; shortening it would
+  cost the desktop reading.
 - A capture and the interaction suite will steal the GPU from each other.
   Run them sequentially, and prefer a static `vite preview` build for
   benchmarking — a dev-server hot reload kills a run mid-flight.

@@ -15,6 +15,9 @@ export type LayoutMode =
 
 export type ColorMatch = 'any' | 'exact' | 'subset';
 
+/** Which shell the UI is showing. The renderer reads this to ignore flight keys. */
+export type ShellMode = 'title' | 'play';
+
 export interface FilterState {
   /** Empty set = no colour constraint. */
   colors: Set<ColorLetter>;
@@ -62,6 +65,8 @@ export interface AppState {
   ready: boolean;
   loadProgress: number;
   loadLabel: string;
+  /** Title screen vs the interactive galaxy. Defaults to title so every visit starts there. */
+  shell: ShellMode;
   layout: LayoutMode;
   filter: FilterState;
   visual: VisualState;
@@ -117,7 +122,8 @@ class Store {
   readonly state: AppState = {
     ready: false,
     loadProgress: 0,
-    loadLabel: 'Charting the universe',
+    loadLabel: 'Charting the aether',
+    shell: 'title',
     layout: 'galaxy',
     filter: defaultFilter(),
     visual: defaultVisual(),

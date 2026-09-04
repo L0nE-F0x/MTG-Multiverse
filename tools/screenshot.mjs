@@ -53,14 +53,6 @@ async function capture(flags, label) {
     const page = await browser.newPage();
     await page.setViewport({ width: WIDTH, height: HEIGHT, deviceScaleFactor: 1 });
 
-    // Suppress the intro overlay before any page script runs. Setting it after
-    // load is too late: the overlay opens the moment `ready` flips.
-    if (!args.intro) {
-      await page.evaluateOnNewDocument(() => {
-        try { localStorage.setItem('mcu.introSeen', '1'); } catch { /* private mode */ }
-      });
-    }
-
     const logs = [];
     page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
     page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
@@ -83,6 +75,12 @@ async function capture(flags, label) {
     });
       console.error('--- console ---\n' + logs.slice(-40).join('\n'));
       return false;
+    }
+
+    // Title screen shows every visit. Captures of the galaxy enter first;
+    // --intro keeps the title up, for landing-page shots.
+    if (!args.intro) {
+      await page.evaluate(() => window.__mcu.ui && window.__mcu.ui.enter());
     }
 
     // --eval-file avoids shell-quoting gymnastics for anything non-trivial.

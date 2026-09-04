@@ -35,7 +35,7 @@ plate.style.cssText = [
 ].join(';');
 
 const title = document.createElement('div');
-title.textContent = 'MAGIC CARD UNIVERSE';
+title.textContent = 'AETHERFIELD';
 title.style.cssText = [
   'font-size:46px', 'font-weight:300', 'letter-spacing:0.24em',
   'color:#eaf4ff', 'text-shadow:0 0 44px rgba(94,231,255,0.55)',

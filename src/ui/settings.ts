@@ -7,6 +7,10 @@ import { el } from './dom.ts';
 import '../styles/settings.css';
 
 export interface SettingsHandle {
+  open(): void;
+  close(): void;
+  toggle(): void;
+  isOpen(): boolean;
   destroy(): void;
 }
 
@@ -110,14 +114,22 @@ export function mountSettings(root: HTMLElement): SettingsHandle {
       'aria-controls': 'mcu-settings-panel',
     },
   });
-  toggle.addEventListener('click', () => {
-    const open = panel.classList.toggle('mcu-settings--open');
+  function setOpen(open: boolean): void {
+    panel.classList.toggle('mcu-settings--open', open);
     toggle.setAttribute('aria-expanded', String(open));
+  }
+
+  toggle.addEventListener('click', () => {
+    setOpen(!panel.classList.contains('mcu-settings--open'));
   });
 
   root.append(toggle, panel);
 
   return {
+    open() { setOpen(true); },
+    close() { setOpen(false); },
+    toggle() { setOpen(!panel.classList.contains('mcu-settings--open')); },
+    isOpen() { return panel.classList.contains('mcu-settings--open'); },
     destroy() {
       for (const off of disposers) off();
       toggle.remove();

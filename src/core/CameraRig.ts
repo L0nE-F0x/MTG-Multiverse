@@ -39,6 +39,19 @@ export class CameraRig {
   maxRadius = 4200;
   autoRotate = false;
   autoRotateSpeed = 0.028;
+  /**
+   * When false, pointer/wheel/keyboard on the canvas are ignored. The title
+   * screen turns this off so WASD cannot fly the camera behind the menu.
+   */
+  inputEnabled = true;
+
+  setInputEnabled(enabled: boolean): void {
+    this.inputEnabled = enabled;
+    if (enabled) return;
+    this.keys.clear();
+    this.dragging = null;
+    this.pointers.clear();
+  }
 
   private readonly element: HTMLElement;
   private readonly goalTarget = new THREE.Vector3();
@@ -83,6 +96,7 @@ export class CameraRig {
     };
 
     on('pointerdown', (e) => {
+      if (!this.inputEnabled) return;
       el.setPointerCapture(e.pointerId);
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       this.poke();
@@ -138,6 +152,7 @@ export class CameraRig {
     on('lostpointercapture', end);
 
     on('wheel', (e) => {
+      if (!this.inputEnabled) return;
       e.preventDefault();
       this.poke();
       // Normalise across the three deltaMode units browsers report.
@@ -151,7 +166,7 @@ export class CameraRig {
     // Keyboard nav is bound to the window, not the canvas, so it works without
     // the user having to click the background first.
     const keyDown = (e: KeyboardEvent) => {
-      if (isTyping()) return;
+      if (!this.inputEnabled || isTyping()) return;
       const k = e.key.toLowerCase();
       if (!NAV_KEYS.has(k)) return;
       e.preventDefault();

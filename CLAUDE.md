@@ -1,4 +1,4 @@
-# Magic Card Universe — working notes
+# Aetherfield — working notes
 
 A WebGL visualisation of all 117,621 printed Magic cards as an explorable
 galaxy. See `README.md` for what it is and how to run it.
@@ -140,6 +140,6 @@ benchmark scenarios cannot be compared if each ran at a different tier.
 
 Use `tools/screenshot.mjs` to iterate on visuals — it drives the system Chromium
 headless against the dev server and reports the WebGL renderer and current fps.
-It suppresses the intro overlay by default (`--intro` keeps it), and `--eval-file`
+It enters from the title screen by default (`--intro` keeps the title up), and `--eval-file`
 runs a script against the page before capturing, which is how the social image is
 composed (`npm run og`). Output is JPEG when the path ends in `.jpg`.

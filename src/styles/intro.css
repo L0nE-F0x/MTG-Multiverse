@@ -7,7 +7,7 @@
 .mcu-intro {
   position: fixed;
   inset: 0;
-  z-index: 90;
+  z-index: 92;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -35,6 +35,8 @@
   flex-direction: column;
   overflow: hidden;
   pointer-events: auto;
+  /* Near-opaque: the title CTA otherwise glows through the 0.78 panel token. */
+  background: rgba(8, 10, 20, 0.94);
   transform: scale(0.94) translateY(10px);
   opacity: 0;
   transition: transform 420ms var(--mcu-ease), opacity 380ms var(--mcu-ease);
@@ -197,6 +199,25 @@
 }
 .mcu-intro-enter:active {
   transform: translateY(0) scale(0.98);
+}
+
+.mcu-intro-back {
+  pointer-events: auto;
+  cursor: pointer;
+  padding: 13px 36px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--mcu-text);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--mcu-border-strong);
+  border-radius: 10px;
+  transition: color 180ms var(--mcu-ease), border-color 180ms var(--mcu-ease);
+}
+.mcu-intro-back:hover {
+  color: var(--mcu-cyan);
+  border-color: rgba(94, 231, 255, 0.45);
 }
 
 .mcu-intro-hint {

@@ -1,7 +1,11 @@
-# Magic Card Universe
+# Aetherfield
 
 Every Magic: The Gathering card ever printed — 117,621 of them — rendered as a
 galaxy you can fly through.
+
+After load, a title screen sits over the turning galaxy. **Enter the Multiverse**
+drops you in; Instructions and Settings stay reachable from there, and from the
+HUD once you are flying.
 
 Nothing about the layout is decorative. A card's position *is* its data:
 

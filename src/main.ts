@@ -6,6 +6,9 @@ import { connectUrlState } from './core/urlState.ts';
 /** Handles exposed by the UI layer; mirrored here so main does not hard-depend on it. */
 interface UIHandles {
   setHoverAnchor(p: { x: number; y: number } | null): void;
+  enter(): void;
+  openTitle(): void;
+  openHelp(): void;
   destroy(): void;
 }
 
@@ -73,7 +76,7 @@ async function main(): Promise<void> {
   boot.root.classList.add('done');
   setTimeout(() => boot.root.remove(), 900);
 
-  Object.assign(window as unknown as Record<string, unknown>, { __mcu: { app, universe, store } });
+  Object.assign(window as unknown as Record<string, unknown>, { __mcu: { app, universe, store, ui } });
 }
 
 main().catch((err: unknown) => {

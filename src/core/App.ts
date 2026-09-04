@@ -198,6 +198,7 @@ export class App {
     });
 
     add<KeyboardEvent>(window, 'keydown', (e) => {
+      if (store.state.shell === 'title') return;
       if (e.key === 'Escape') { store.set('selected', -1); return; }
 
       // Never steal keys from a text field.
@@ -234,7 +235,12 @@ export class App {
       }),
       store.on('visual', (v) => this.applyVisual(v)),
       store.on('selected', (i) => this.applySelection(i)),
+      store.on('shell', (mode) => {
+        this.rig.setInputEnabled(mode === 'play');
+        this.labels.setEnabled(store.state.visual.showLabels && mode === 'play');
+      }),
     );
+    this.rig.setInputEnabled(store.state.shell === 'play');
   }
 
   /** Frame the whole current layout again, without changing the heading. */
@@ -333,7 +339,7 @@ export class App {
     this.nebula.setIntensity(v.nebula);
     this.applyNebulaDensity();
     this.rig.autoRotate = v.autoRotate;
-    this.labels.setEnabled(v.showLabels);
+    this.labels.setEnabled(v.showLabels && store.state.shell === 'play');
   }
 
   private applySelection(i: number): void {

@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-    <title>Magic Card Universe — every Magic card ever printed, as a galaxy</title>
-    <meta name="description" content="All 117,621 Magic: The Gathering cards ever printed, rendered as one explorable 3D galaxy. Spiral arms are colour identity, distance from the core is release date, and the brightest stars are the cards you know." />
+    <title>Aetherfield — every Magic card ever printed, as a galaxy</title>
+    <meta name="description" content="Aetherfield: all 117,621 Magic: The Gathering cards ever printed, rendered as one explorable 3D galaxy. Spiral arms are colour identity, distance from the core is release date, and the brightest stars are the cards you know." />
     <meta name="theme-color" content="#05060d" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="canonical" href="%SITE_URL%/" />
@@ -14,10 +14,10 @@
          required here: WhatsApp in particular will not resolve a relative
          og:image. -->
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Magic Card Universe" />
+    <meta property="og:site_name" content="Aetherfield" />
     <meta property="og:url" content="%SITE_URL%/" />
-    <meta property="og:title" content="Magic Card Universe" />
-    <meta property="og:description" content="All 117,621 Magic: The Gathering cards ever printed, rendered as one explorable 3D galaxy. Spiral arms are colour identity, distance from the core is release date, and the brightest stars are the cards you know." />
+    <meta property="og:title" content="Aetherfield" />
+    <meta property="og:description" content="Aetherfield: all 117,621 Magic: The Gathering cards ever printed, rendered as one explorable 3D galaxy. Spiral arms are colour identity, distance from the core is release date, and the brightest stars are the cards you know." />
     <meta property="og:image" content="%SITE_URL%/og.jpg" />
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
@@ -25,8 +25,8 @@
     <meta property="og:image:alt" content="A spiral galaxy made of Magic: The Gathering cards, with five arms coloured white, blue, violet, red and green." />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Magic Card Universe" />
-    <meta name="twitter:description" content="All 117,621 Magic: The Gathering cards ever printed, rendered as one explorable 3D galaxy." />
+    <meta name="twitter:title" content="Aetherfield" />
+    <meta name="twitter:description" content="Aetherfield: all 117,621 Magic: The Gathering cards ever printed, rendered as one explorable 3D galaxy." />
     <meta name="twitter:image" content="%SITE_URL%/og.jpg" />
     <style>
       /* Base shell only. Everything else lives in src/styles/, owned by the UI layer. */
@@ -42,18 +42,36 @@
       #boot {
         position: fixed; inset: 0; z-index: 9999;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
-        gap: 22px; background: radial-gradient(ellipse at 50% 55%, #0b1024 0%, #04050b 70%);
+        gap: 18px; background: radial-gradient(ellipse at 50% 42%, #0b1024 0%, #04050b 68%);
         transition: opacity 700ms cubic-bezier(0.16, 1, 0.3, 1);
       }
       #boot.done { opacity: 0; pointer-events: none; }
-      #boot-title {
-        font-size: clamp(15px, 2.2vw, 22px); font-weight: 300;
-        letter-spacing: 0.44em; text-indent: 0.44em; text-transform: uppercase;
-        color: #cfe4ff; text-shadow: 0 0 26px rgba(94, 231, 255, 0.45);
+      #boot-scan {
+        position: absolute; inset: 0; pointer-events: none;
+        background: repeating-linear-gradient(
+          0deg, rgba(140, 180, 255, 0.03) 0px, rgba(140, 180, 255, 0.03) 1px,
+          transparent 1px, transparent 3px
+        );
       }
+      #boot-mark {
+        width: 88px; height: 88px;
+        filter: drop-shadow(0 0 16px rgba(94, 231, 255, 0.3));
+        animation: boot-spin 80s linear infinite;
+      }
+      #boot-title {
+        font-size: clamp(22px, 4.6vw, 40px); font-weight: 300;
+        letter-spacing: 0.34em; text-indent: 0.34em; text-transform: uppercase;
+        background: linear-gradient(120deg, #eaf4ff 0%, #5ee7ff 45%, #a56bff 100%);
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+        filter: drop-shadow(0 0 22px rgba(94, 231, 255, 0.4));
+        animation: boot-glow 3.2s ease-in-out infinite;
+      }
+      #boot-pips { display: flex; gap: 8px; }
+      #boot-pips span { width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 7px currentColor; }
       #boot-track {
-        width: min(340px, 62vw); height: 1px; background: rgba(140, 180, 255, 0.16);
-        position: relative; overflow: visible;
+        width: min(340px, 62vw); height: 2px; margin-top: 8px;
+        background: rgba(140, 180, 255, 0.14);
+        position: relative; overflow: visible; border-radius: 2px;
       }
       #boot-fill {
         position: absolute; inset: 0 auto 0 0; width: 0%;
@@ -66,8 +84,14 @@
         color: rgba(174, 199, 235, 0.68); font-variant-numeric: tabular-nums;
       }
       #boot-label.error { color: #ff8f7a; letter-spacing: 0.08em; text-transform: none; max-width: 46ch; text-align: center; line-height: 1.6; }
+      @keyframes boot-spin { to { transform: rotate(360deg); } }
+      @keyframes boot-glow {
+        0%, 100% { filter: drop-shadow(0 0 14px rgba(94, 231, 255, 0.28)); }
+        50% { filter: drop-shadow(0 0 28px rgba(165, 107, 255, 0.5)); }
+      }
       @media (prefers-reduced-motion: reduce) {
         #boot, #boot-fill { transition: none; }
+        #boot-mark, #boot-title { animation: none; }
       }
     </style>
   </head>
@@ -75,7 +99,33 @@
     <canvas id="stage"></canvas>
     <div id="ui-root"></div>
     <div id="boot">
-      <div id="boot-title">Magic Card Universe</div>
+      <div id="boot-scan"></div>
+      <svg id="boot-mark" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+        <defs>
+          <radialGradient id="boot-core" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#ffffff"/>
+            <stop offset="40%" stop-color="#ffe9a8"/>
+            <stop offset="100%" stop-color="#ff9a4d" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <g stroke-linecap="round" stroke-linejoin="round" stroke-width="2.6">
+          <path d="M32 26 L35.45 21.98 L41.36 20.02 L48.61 21.22 L55.68 26.1 L60.89 34.53" stroke="#f8f6d8"/>
+          <path d="M37.71 30.15 L42.6 32.18 L46.28 37.2 L47.39 44.46 L44.93 52.69 L38.52 60.26" stroke="#7eb6d9"/>
+          <path d="M35.53 36.85 L35.1 42.14 L31.47 47.19 L24.9 50.48 L16.32 50.69 L7.14 46.94" stroke="#8a7f78"/>
+          <path d="M28.47 36.85 L23.32 38.08 L17.39 36.19 L12.23 30.96 L9.38 22.86 L10.11 12.97" stroke="#e49977"/>
+          <path d="M26.29 30.15 L23.53 25.62 L23.5 19.4 L26.88 12.87 L33.7 7.66 L43.33 5.31" stroke="#7ecb9a"/>
+        </g>
+        <circle cx="32" cy="32" r="11" fill="url(#boot-core)"/>
+        <circle cx="32" cy="32" r="2.6" fill="#ffffff"/>
+      </svg>
+      <div id="boot-title">Aetherfield</div>
+      <div id="boot-pips" aria-hidden="true">
+        <span style="background:#f8f6d8;color:#f8f6d8"></span>
+        <span style="background:#c1d7e9;color:#c1d7e9"></span>
+        <span style="background:#bab1ab;color:#bab1ab"></span>
+        <span style="background:#e49977;color:#e49977"></span>
+        <span style="background:#9bd3ae;color:#9bd3ae"></span>
+      </div>
       <div id="boot-track"><div id="boot-fill"></div></div>
       <div id="boot-label">Initialising</div>
     </div>
