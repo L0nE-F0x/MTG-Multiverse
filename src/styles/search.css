@@ -1,19 +1,27 @@
-/* Prominent top-centre search bar + results dropdown. */
+/* Compact search, tucked beside Settings so it is not sitting on the galaxy. */
 
 .mcu-search {
   position: fixed;
   top: 20px;
-  left: 50%;
-  translate: -50% 0;
-  width: min(480px, 90vw);
+  right: 130px;
+  width: 220px;
   pointer-events: auto;
   z-index: 30;
   animation: mcu-panel-in 500ms var(--mcu-ease) both;
+  transition: width 240ms var(--mcu-ease);
+}
+.mcu-search:focus-within,
+.mcu-search--open {
+  width: min(340px, calc(100vw - 160px));
+}
+
+.mcu-search-field {
+  position: relative;
 }
 
 .mcu-search-icon {
   position: absolute;
-  left: 14px;
+  left: 12px;
   top: 50%;
   translate: 0 -50%;
   width: 11px;
@@ -35,16 +43,19 @@
 
 .mcu-search-input {
   width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
   background: var(--mcu-panel-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--mcu-border);
   border-radius: 10px;
-  padding: 12px 16px 12px 36px;
+  padding: 9px 14px 9px 34px;
   font-size: 13px;
   color: var(--mcu-text);
   outline: none;
-  transition: all 200ms var(--mcu-ease);
+  box-shadow: none;
+  transition: border-color 200ms var(--mcu-ease), box-shadow 200ms var(--mcu-ease);
 }
 .mcu-search-input::placeholder {
   color: var(--mcu-text-faint);
@@ -53,21 +64,23 @@
   border-color: var(--mcu-cyan);
   box-shadow: 0 0 0 3px rgba(94, 231, 255, 0.12), 0 0 24px rgba(94, 231, 255, 0.2);
 }
+.mcu-root .mcu-search-input:focus-visible {
+  outline: none;
+}
 
 .mcu-search-results {
+  display: none;
   margin-top: 8px;
-  max-height: 0;
+  max-height: 360px;
   overflow: hidden auto;
   background: var(--mcu-panel-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-radius: 10px;
-  border: 1px solid transparent;
-  transition: max-height 260ms var(--mcu-ease), border-color 200ms var(--mcu-ease);
+  border: 1px solid var(--mcu-border);
 }
 .mcu-search--open .mcu-search-results {
-  max-height: 360px;
-  border-color: var(--mcu-border);
+  display: block;
 }
 
 .mcu-search-row {
@@ -110,7 +123,14 @@
 }
 
 @media (max-width: 900px) {
-  .mcu-search { top: var(--mcu-mobile-search-top); width: 92vw; }
+  .mcu-search,
+  .mcu-search:focus-within,
+  .mcu-search--open {
+    top: var(--mcu-mobile-search-top);
+    left: 10px;
+    right: 10px;
+    width: auto;
+  }
   /* 16px stops iOS Safari auto-zooming the page on focus. */
   .mcu-search-input { font-size: 16px; min-height: var(--mcu-touch); }
   .mcu-search-row { padding: 12px 14px; min-height: var(--mcu-touch); }

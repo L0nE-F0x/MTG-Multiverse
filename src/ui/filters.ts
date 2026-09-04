@@ -22,15 +22,40 @@ const TYPE_LIST: TypeName[] = [
   'land', 'planeswalker', 'battle', 'token', 'legendary',
 ];
 
+const TYPE_TIP = {
+  creature: 'Keep creatures.',
+  instant: 'Keep instants.',
+  sorcery: 'Keep sorceries.',
+  artifact: 'Keep artifacts.',
+  enchantment: 'Keep enchantments.',
+  land: 'Keep lands.',
+  planeswalker: 'Keep planeswalkers.',
+  battle: 'Keep battles.',
+  token: 'Keep token cards.',
+  legendary: 'Keep legendary cards.',
+} as const;
+
 const FORMAT_LIST: FormatName[] = [
   'standard', 'pioneer', 'modern', 'legacy', 'vintage', 'commander', 'pauper',
 ];
 
-function sectionWrap(title: string, children: (Node | string)[]): HTMLElement {
-  return el('section', { className: 'mcu-filter-section' }, [
-    el('h3', { className: 'mcu-filter-heading', text: title }),
-    ...children,
-  ]);
+const COLOR_NAME: Record<ColorLetter, string> = {
+  W: 'White',
+  U: 'Blue',
+  B: 'Black',
+  R: 'Red',
+  G: 'Green',
+};
+
+function tip<T extends HTMLElement>(node: T, text: string): T {
+  node.setAttribute('data-tip', text);
+  return node;
+}
+
+function sectionWrap(title: string, children: (Node | string)[], headingTip?: string): HTMLElement {
+  const heading = el('h3', { className: 'mcu-filter-heading', text: title });
+  if (headingTip) tip(heading, headingTip);
+  return el('section', { className: 'mcu-filter-section' }, [heading, ...children]);
 }
 
 export function mountFilters(root: HTMLElement, universe: Universe): FiltersHandle {
@@ -41,8 +66,9 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
     const btn = el('button', {
       className: 'mcu-color-pip',
       text: c,
-      attrs: { type: 'button', 'aria-label': `Colour ${c}`, 'aria-pressed': 'false' },
+      attrs: { type: 'button', 'aria-label': COLOR_NAME[c], 'aria-pressed': 'false' },
     });
+    tip(btn, `${COLOR_NAME[c]} colour identity.`);
     btn.style.setProperty('--pip-color', MANA_COLOR_HEX[c] ?? '#888');
     btn.addEventListener('click', () => {
       const colors = new Set(store.state.filter.colors);
@@ -53,11 +79,14 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
     pipButtons.set(c, btn);
     pipsRow.append(btn);
   }
-  const colorlessBtn = el('button', {
-    className: 'mcu-toggle-chip',
-    text: 'Colourless',
-    attrs: { type: 'button', 'aria-pressed': 'false' },
-  });
+  const colorlessBtn = tip(
+    el('button', {
+      className: 'mcu-toggle-chip',
+      text: 'Colourless',
+      attrs: { type: 'button', 'aria-pressed': 'false' },
+    }),
+    'Cards with no colour identity — artifacts, most lands, and the like. Only applies once you pick a colour; otherwise they are already visible.',
+  );
   colorlessBtn.addEventListener('click', () => {
     store.patchFilter({ includeColorless: !store.state.filter.includeColorless });
   });
@@ -67,12 +96,18 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
     className: 'mcu-segmented mcu-segmented--sm',
     attrs: { role: 'group', 'aria-label': 'Colour match mode' },
   });
+  const MATCH_TIP: Record<ColorMatch, string> = {
+    any: 'Keep cards that contain any of the selected colours.',
+    exact: 'Keep cards whose colour identity is exactly the selected colours.',
+    subset: 'Keep cards whose colours all sit among the selected ones — no extras.',
+  };
   (['any', 'exact', 'subset'] as ColorMatch[]).forEach((m) => {
     const b = el('button', {
       className: 'mcu-segmented-btn',
       text: capitalize(m),
       attrs: { type: 'button', 'aria-pressed': 'false' },
     });
+    tip(b, MATCH_TIP[m]);
     b.addEventListener('click', () => store.patchFilter({ colorMatch: m }));
     modeButtons.set(m, b);
     modeSeg.append(b);
@@ -85,15 +120,21 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
       btn.classList.toggle('mcu-color-pip--active', active);
       btn.setAttribute('aria-pressed', String(active));
     }
-    colorlessBtn.classList.toggle('mcu-toggle-chip--active', f.includeColorless);
-    colorlessBtn.setAttribute('aria-pressed', String(f.includeColorless));
+    const colorActive = f.colors.size > 0;
+    colorlessBtn.disabled = !colorActive;
+    colorlessBtn.classList.toggle('mcu-toggle-chip--active', colorActive && f.includeColorless);
+    colorlessBtn.setAttribute('aria-pressed', String(colorActive && f.includeColorless));
     for (const [m, b] of modeButtons) {
       const active = f.colorMatch === m;
       b.classList.toggle('mcu-segmented-btn--active', active);
       b.setAttribute('aria-pressed', String(active));
     }
   }
-  const colorSection = sectionWrap('Colour', [pipsRow, colorlessBtn, modeSeg]);
+  const colorSection = sectionWrap(
+    'Colour',
+    [pipsRow, colorlessBtn, modeSeg],
+    'Select colours to keep. With none selected, every colour is visible.',
+  );
 
   // ---- Type -------------------------------------------------------------
   const typeButtons = new Map<TypeName, HTMLButtonElement>();
@@ -104,6 +145,7 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
       text: capitalize(t),
       attrs: { type: 'button', 'aria-pressed': 'false' },
     });
+    tip(b, TYPE_TIP[t as keyof typeof TYPE_TIP] ?? `Keep ${t} cards.`);
     b.addEventListener('click', () => {
       const types = new Set(store.state.filter.types);
       if (types.has(t)) types.delete(t);
@@ -121,7 +163,11 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
       b.setAttribute('aria-pressed', String(active));
     }
   }
-  const typeSection = sectionWrap('Type', [typeRow]);
+  const typeSection = sectionWrap(
+    'Type',
+    [typeRow],
+    'With no type selected, every type is visible.',
+  );
 
   // ---- Rarity -------------------------------------------------------------
   const rarityButtons = new Map<number, HTMLButtonElement>();
@@ -132,6 +178,7 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
       text: capitalize(name),
       attrs: { type: 'button', 'aria-pressed': 'false' },
     });
+    tip(b, `Keep ${name} printings.`);
     b.style.setProperty('--rarity-color', rarityColor(name));
     b.addEventListener('click', () => {
       const rarities = new Set(store.state.filter.rarities);
@@ -150,7 +197,11 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
       b.setAttribute('aria-pressed', String(active));
     }
   }
-  const raritySection = sectionWrap('Rarity', [rarityRow]);
+  const raritySection = sectionWrap(
+    'Rarity',
+    [rarityRow],
+    'With no rarity selected, every rarity is visible.',
+  );
 
   // ---- Format -------------------------------------------------------------
   const formatButtons = new Map<FormatName, HTMLButtonElement>();
@@ -161,6 +212,7 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
       text: capitalize(fmt),
       attrs: { type: 'button', 'aria-pressed': 'false' },
     });
+    tip(b, `Keep cards legal in ${capitalize(fmt)}.`);
     b.addEventListener('click', () => {
       const formats = new Set(store.state.filter.formats);
       if (formats.has(fmt)) formats.delete(fmt);
@@ -178,7 +230,11 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
       b.setAttribute('aria-pressed', String(active));
     }
   }
-  const formatSection = sectionWrap('Format', [formatRow]);
+  const formatSection = sectionWrap(
+    'Format',
+    [formatRow],
+    'With no format selected, legality is ignored.',
+  );
 
   // ---- Year range -------------------------------------------------------------
   const maxYear = Math.max(1993, releaseDayToYear(universe.meta.stats.maxReleaseDay));
@@ -188,7 +244,11 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
     value: store.state.filter.years,
     onChange: (years) => store.patchFilter({ years }),
   });
-  const yearSection = sectionWrap('Year', [yearSlider.el]);
+  const yearSection = sectionWrap(
+    'Year',
+    [yearSlider.el],
+    'Release year of this printing. Alpha is 1993.',
+  );
 
   // ---- Mana value range -------------------------------------------------------------
   const cmcSlider = createDualRangeSlider({
@@ -198,13 +258,20 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
     formatValue: (v) => (v >= 30 ? '30+' : String(v)),
     onChange: (cmc) => store.patchFilter({ cmc }),
   });
-  const cmcSection = sectionWrap('Mana value', [cmcSlider.el]);
+  const cmcSection = sectionWrap(
+    'Mana value',
+    [cmcSlider.el],
+    'Converted mana cost of this printing. 30+ is anything 30 or more.',
+  );
 
   // ---- Set picker -------------------------------------------------------------
-  const setSearchInput = el('input', {
-    className: 'mcu-set-search',
-    attrs: { type: 'text', placeholder: 'Filter sets…', autocomplete: 'off' },
-  });
+  const setSearchInput = tip(
+    el('input', {
+      className: 'mcu-set-search',
+      attrs: { type: 'text', placeholder: 'Filter sets…', autocomplete: 'off' },
+    }),
+    'Type a set name or code to narrow this list.',
+  );
   const setCountLabel = el('div', { className: 'mcu-set-count' });
   const setListEl = el('div', { className: 'mcu-set-list' });
   const setRows: { code: string; name: string; idx: number; row: HTMLElement }[] = [];
@@ -244,7 +311,11 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
     }
     setCountLabel.textContent = f.sets.size ? `${f.sets.size} set${f.sets.size === 1 ? '' : 's'} selected` : 'All sets';
   }
-  const setSection = sectionWrap('Sets', [setSearchInput, setCountLabel, setListEl]);
+  const setSection = sectionWrap(
+    'Sets',
+    [setSearchInput, setCountLabel, setListEl],
+    'With no set selected, every set is visible.',
+  );
 
   // ---- Checkboxes -------------------------------------------------------------
   const reprintsCb = el('input', { attrs: { type: 'checkbox' } });
@@ -260,9 +331,18 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
     tokensCb.checked = f.hideTokens;
   }
   const optionsSection = sectionWrap('Options', [
-    el('label', { className: 'mcu-checkbox-row' }, [reprintsCb, document.createTextNode('Hide reprints')]),
-    el('label', { className: 'mcu-checkbox-row' }, [digitalCb, document.createTextNode('Hide digital-only')]),
-    el('label', { className: 'mcu-checkbox-row' }, [tokensCb, document.createTextNode('Hide tokens & art cards')]),
+    tip(
+      el('label', { className: 'mcu-checkbox-row' }, [reprintsCb, document.createTextNode('Hide reprints')]),
+      'Hide later printings, keeping the earliest of each card.',
+    ),
+    tip(
+      el('label', { className: 'mcu-checkbox-row' }, [digitalCb, document.createTextNode('Hide digital-only')]),
+      'Hide Magic Arena and Magic Online-only printings.',
+    ),
+    tip(
+      el('label', { className: 'mcu-checkbox-row' }, [tokensCb, document.createTextNode('Hide tokens & art cards')]),
+      'Hide tokens, emblems, and art cards. On by default.',
+    ),
   ]);
 
   // ---- Assembly -------------------------------------------------------------
@@ -279,7 +359,10 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
   paintAll();
   const offFilter = store.on('filter', paintAll);
 
-  const resetBtn = el('button', { className: 'mcu-reset-btn', text: 'Reset filters', attrs: { type: 'button' } });
+  const resetBtn = tip(
+    el('button', { className: 'mcu-reset-btn', text: 'Reset filters', attrs: { type: 'button' } }),
+    'Return every filter to its default.',
+  );
   resetBtn.addEventListener('click', () => store.set('filter', defaultFilter()));
 
   const header = el('div', { className: 'mcu-filters-header' }, [
@@ -320,26 +403,67 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
     tab.setAttribute('aria-expanded', String(open));
   }
   tab.addEventListener('click', () => setOpen(true));
-  const closeBtn = el('button', {
-    className: 'mcu-filters-close',
-    text: '«',
-    attrs: { type: 'button', 'aria-label': 'Collapse filters panel' },
-  });
+  const closeBtn = tip(
+    el('button', {
+      className: 'mcu-filters-close',
+      text: '«',
+      attrs: { type: 'button', 'aria-label': 'Collapse filters panel' },
+    }),
+    'Collapse the filter panel.',
+  );
   closeBtn.addEventListener('click', () => setOpen(false));
   header.append(closeBtn);
 
   setOpen(window.matchMedia('(min-width: 900px)').matches);
 
-  root.append(tab, panel);
+  const floatTip = el('div', {
+    className: 'mcu-float-tip',
+    attrs: { role: 'tooltip', hidden: '' },
+  });
+  let tipAnchor: HTMLElement | null = null;
+
+  function placeTip(anchor: HTMLElement): void {
+    const text = anchor.getAttribute('data-tip');
+    if (!text) return;
+    floatTip.textContent = text;
+    floatTip.hidden = false;
+    const r = anchor.getBoundingClientRect();
+    const tipR = floatTip.getBoundingClientRect();
+    let left = r.right + 10;
+    let top = r.top + r.height / 2 - tipR.height / 2;
+    if (left + tipR.width > window.innerWidth - 8) left = Math.max(8, r.left - tipR.width - 10);
+    if (top < 8) top = 8;
+    if (top + tipR.height > window.innerHeight - 8) top = window.innerHeight - tipR.height - 8;
+    floatTip.style.left = `${left}px`;
+    floatTip.style.top = `${top}px`;
+  }
+
+  const offTipOver = listen(panel, 'pointerover', (e) => {
+    const a = (e.target as HTMLElement | null)?.closest?.('[data-tip]');
+    if (!(a instanceof HTMLElement) || !panel.contains(a)) return;
+    tipAnchor = a;
+    placeTip(a);
+  });
+  const offTipOut = listen(panel, 'pointerout', (e) => {
+    const to = (e as PointerEvent).relatedTarget as Node | null;
+    if (tipAnchor && to && (tipAnchor === to || tipAnchor.contains(to))) return;
+    floatTip.hidden = true;
+    tipAnchor = null;
+  });
+
+  root.append(tab, panel, floatTip);
 
   return {
     destroy() {
       offFilter();
       offSetSearch();
+      offTipOver();
+      offTipOut();
       yearSlider.destroy();
       cmcSlider.destroy();
       tab.remove();
       panel.remove();
+      floatTip.remove();
     },
   };
 }

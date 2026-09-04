@@ -94,6 +94,10 @@
   flex-direction: column;
   gap: 8px;
 }
+.mcu-filter-heading[data-tip],
+.mcu-checkbox-row[data-tip] {
+  cursor: help;
+}
 
 .mcu-color-pips {
   display: flex;
@@ -129,6 +133,32 @@
    with an extra `.mcu-root` ancestor to actually out-specificity it). */
 .mcu-root .mcu-color-pip:focus-visible {
   border-radius: 50%;
+}
+
+.mcu-toggle-chip:disabled {
+  opacity: 0.4;
+  cursor: default;
+  box-shadow: none;
+  filter: grayscale(0.3);
+}
+
+.mcu-float-tip {
+  position: fixed;
+  z-index: 80;
+  max-width: 240px;
+  padding: 8px 10px;
+  font-size: 11px;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  color: var(--mcu-text);
+  background: rgba(8, 10, 20, 0.94);
+  border: 1px solid var(--mcu-border-strong);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+.mcu-float-tip[hidden] {
+  display: none;
 }
 
 .mcu-toggle-chip--rarity {

@@ -46,7 +46,6 @@ export interface VisualState {
   nebula: number;
   showNebula: boolean;
   showLabels: boolean;
-  showGrid: boolean;
   motionBlur: boolean;
   dimFiltered: number;
   /** 0 = free flight, 1 = orbiting the selection. */
@@ -84,7 +83,7 @@ export function defaultFilter(): FilterState {
   return {
     colors: new Set(),
     colorMatch: 'any',
-    includeColorless: true,
+    includeColorless: false,
     types: new Set(),
     rarities: new Set(),
     formats: new Set(),
@@ -106,10 +105,9 @@ export function defaultVisual(): VisualState {
     nebula: 1.0,
     showNebula: true,
     showLabels: true,
-    showGrid: false,
     motionBlur: true,
     dimFiltered: 0.018,
-    autoRotate: false,
+    autoRotate: true,
   };
 }
 

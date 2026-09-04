@@ -13,14 +13,15 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 # ▶ START HERE — next session
 
-0. **2026-09-04, Aetherfield shipped.** Rebrand + title screen on `main`.
-   Next slice is **filter polish** (and other in-galaxy fine detail).
+0. **2026-09-04, filter/search polish.** Auto-rotate on by default, search
+   moved off the galaxy, filter hover tips, Colourless no longer glows at
+   rest, Grid toggle removed (it never drew anything).
 
    ### Git
 
    | | |
    |---|---|
-   | Latest | this commit — *Rename to Aetherfield and add a title screen* |
+   | Latest | this commit |
    | Branch | `main` |
    | Remote | https://github.com/L0nE-F0x/MTG-Multiverse |
 

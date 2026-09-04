@@ -89,7 +89,6 @@ export function mountSettings(root: HTMLElement): SettingsHandle {
     el('h3', { className: 'mcu-filter-heading', text: 'Display' }),
     checkbox('Nebula', () => store.state.visual.showNebula, (v) => store.patchVisual({ showNebula: v })),
     checkbox('Labels', () => store.state.visual.showLabels, (v) => store.patchVisual({ showLabels: v })),
-    checkbox('Grid', () => store.state.visual.showGrid, (v) => store.patchVisual({ showGrid: v })),
     checkbox('Motion blur', () => store.state.visual.motionBlur, (v) => store.patchVisual({ motionBlur: v })),
     checkbox('Auto-rotate', () => store.state.visual.autoRotate, (v) => store.patchVisual({ autoRotate: v })),
     el('h3', { className: 'mcu-filter-heading', text: 'Telemetry' }),

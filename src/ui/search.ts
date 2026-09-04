@@ -1,7 +1,7 @@
 /**
- * The prominent top-centre search box: debounced name search with a
- * keyboard-navigable results dropdown. `/` or Ctrl+K focuses it from
- * anywhere (unless the user is already typing in another field).
+ * Compact name search with a keyboard-navigable results dropdown.
+ * `/` or Ctrl+K focuses it from anywhere (unless the user is already
+ * typing in another field, or the title screen is up).
  */
 import { store } from '../core/store.ts';
 import type { Universe } from '../data/universe.ts';
@@ -14,12 +14,7 @@ export interface SearchHandle {
 }
 
 export function mountSearch(root: HTMLElement, universe: Universe): SearchHandle {
-  // The full hint crowds out at phone widths (and the 16px font a touch
-  // input needs, to stop iOS auto-zooming on focus, makes it worse) —
-  // drop the keybinding hint there, the search icon still reads as search.
-  const placeholder = window.matchMedia('(max-width: 420px)').matches
-    ? `Search ${universe.count.toLocaleString()} cards…`
-    : `Search ${universe.count.toLocaleString()} cards…  (/ or Ctrl+K)`;
+  const placeholder = `Search ${universe.count.toLocaleString()} cards…`;
   const input = el('input', {
     className: 'mcu-search-input',
     attrs: {
@@ -39,8 +34,10 @@ export function mountSearch(root: HTMLElement, universe: Universe): SearchHandle
     attrs: { role: 'listbox', id: 'mcu-search-listbox' },
   });
   const wrap = el('div', { className: 'mcu-search' }, [
-    el('div', { className: 'mcu-search-icon' }),
-    input,
+    el('div', { className: 'mcu-search-field' }, [
+      el('div', { className: 'mcu-search-icon' }),
+      input,
+    ]),
     list,
   ]);
   root.append(wrap);

@@ -171,6 +171,7 @@ try {
   // Title auto-rotate leaves the heading wherever it drifted. Pin the default
   // angle so the Black Lotus pick is not at the mercy of how long the menu sat.
   await page.evaluate(() => {
+    window.__mcu.store.patchVisual({ autoRotate: false });
     const app = window.__mcu.app;
     app.rig.setAngles(Math.PI * 0.25, app.starfield.framePhi());
     app.resetView();

@@ -57,9 +57,10 @@ Top-centre search box with a keyboard-navigable results dropdown.
 - Writes: `results` (`store.set`, from `universe.search(q, 40)`),
   `filter.query` (`store.patchFilter`), `selected` (`store.set`, on
   choosing a result).
-- Debounces input 120ms. `/` or Ctrl+K focuses the box from anywhere
-  (skipped while another field has focus, and while `store.state.shell`
-  is `title`). ArrowUp/ArrowDown moves the
+- Debounces input 120ms. `/` or Ctrl+K still focuses the box (skipped
+  while another field has focus, and while `store.state.shell` is
+  `title`) but the placeholder no longer advertises the shortcut. The
+  field sits top-right, left of Settings, and expands on focus. ArrowUp/ArrowDown moves the
   active row, Enter selects it, Escape clears the query and closes the
   dropdown. Closes on outside click.
 - The input is a `role="combobox"` wired to the results list
@@ -67,14 +68,17 @@ Top-centre search box with a keyboard-navigable results dropdown.
   `aria-activedescendant` following the arrow-key-active row and each row
   carrying `aria-selected` — the standard listbox-with-virtual-focus
   pattern, since focus itself stays in the input rather than moving to
-  each row. Below ~420px width the placeholder drops the `(/ or Ctrl+K)`
-  hint (it doesn't fit next to the larger 16px font a text input needs at
-  that width to stop iOS Safari auto-zooming on focus).
+  each row. Below 900px the field stretches under the command bar; the
+  input is 16px so iOS Safari does not auto-zoom on focus.
 
 ### `filters.ts` — `mountFilters(root, universe)`
 Collapsible left-edge panel. Every control reads `store.state.filter` to
 paint itself and writes back through `store.patchFilter`; "Reset filters"
 replaces the whole object with `store.set('filter', defaultFilter())`.
+- Hover tips (`data-tip` + a floating tooltip on `mcu-root`) explain every
+  control. Colourless is off by default and disabled until a colour pip
+  is selected — with no colours selected the flag is a no-op and the
+  engine already shows colourless cards.
 - Reads/writes `filter.colors`, `filter.colorMatch`, `filter.includeColorless`
   (colour pips + colourless toggle + Any/Exact/Subset segmented control),
   `filter.types` (10 type toggles), `filter.rarities` (toggles built from
@@ -146,8 +150,9 @@ mana value (`universe.col.cmc[i]`, shown as `MV n`, or `—` for the 255
 Collapsible top-right visual settings panel.
 - Reads/writes `visual.bloom`, `visual.exposure`, `visual.starSize`,
   `visual.nebula`, `visual.dimFiltered` (sliders), `visual.showNebula`,
-  `visual.showLabels`, `visual.showGrid`, `visual.motionBlur`,
-  `visual.autoRotate` (checkboxes) — all via `store.patchVisual`.
+  `visual.showLabels`, `visual.motionBlur`, `visual.autoRotate`
+  (checkboxes) — all via `store.patchVisual`. Auto-rotate defaults on.
+  There is no Grid toggle: `showGrid` was store-only and never drawn.
 - Reads: `stats` (fps + visible/total) for the telemetry readout at the
   bottom of the panel. Writes: none for telemetry.
 - The `SETTINGS` toggle carries `aria-expanded`/`aria-controls` reflecting
