@@ -7,10 +7,16 @@ import glsl from 'vite-plugin-glsl';
  * known until build time. Netlify exposes it, so substitute it then.
  */
 function siteUrl(): Plugin {
+  // Netlify sets both, and they differ. `URL` is the canonical site address;
+  // `DEPLOY_PRIME_URL` is this particular deploy's address, which for a branch
+  // deploy of main is the branch-prefixed `main--<site>.netlify.app`. Taking
+  // DEPLOY_PRIME_URL first meant the production site advertised og:url and
+  // og:image on a hostname nobody would ever share. Previews still want to
+  // reference themselves, so the choice is by context, not by precedence.
+  const env = process.env;
   const url = (
-    process.env.DEPLOY_PRIME_URL ||
-    process.env.URL ||
-    process.env.VITE_SITE_URL ||
+    (env.CONTEXT === 'production' ? env.URL : env.DEPLOY_PRIME_URL || env.URL) ||
+    env.VITE_SITE_URL ||
     'https://mtg-multiverse.netlify.app'
   ).replace(/\/$/, '');
 
