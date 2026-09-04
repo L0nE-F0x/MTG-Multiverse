@@ -1,7 +1,9 @@
 # Magic Card Universe — working notes
 
-A WebGL visualisation of all 112,326 printed Magic cards as an explorable
+A WebGL visualisation of all 117,621 printed Magic cards as an explorable
 galaxy. See `README.md` for what it is and how to run it.
+
+**Live todo is `handoff.md`.** Read that first on a new session.
 
 ## Commands
 
