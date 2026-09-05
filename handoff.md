@@ -13,12 +13,11 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 # ▶ START HERE — next session
 
-**2026-09-05 — phase 3: FND sidebar opens this on the title screen.**
+**2026-09-05 — FND v3.7.0 shipped the title screen and deep links.**
 
-FND dropped the default `?shell=play`. Install is already hidden when
-`isEmbedded()`. Cinematic stays skipped in a frame. Sets/DeckView still
-pass `shell=play` so those deep links skip the title. Needs `npm run
-aetherfield` in FND and a versioned release before installers see any of it.
+Filthy Net Deck v3.7.0 vendors this build. Sidebar opens on the title
+(Enter / Tour / Settings). Sets/DeckView still pass `?shell=play`. Install
+is hidden when `isEmbedded()`. Cinematic stays skipped in a frame.
 
 Phase 2 (done): filthy-net-deck.com/aetherfield 200-proxies this origin.
 No slash-adding 301 (that looped). Service worker still registers only at
