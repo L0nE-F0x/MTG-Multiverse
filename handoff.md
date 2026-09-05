@@ -13,23 +13,16 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 # ▶ START HERE — next session
 
-**2026-09-05 — phase 2: public URL is filthy-net-deck.com/aetherfield.**
+**2026-09-05 — phase 3: FND sidebar opens this on the title screen.**
 
-Polish is on `main` (`bdd5fd8`). FND's marketing site 200-proxies
-`/aetherfield` and `/aetherfield/*` at this origin — **no slash-adding 301**
-(that looped). `index.html` client-replaces the exact path `/aetherfield` so
-relative assets still resolve. The iframe inside the app is still a vendored
-`dist/` — this URL does not update installers.
+FND dropped the default `?shell=play`. Install is already hidden when
+`isEmbedded()`. Cinematic stays skipped in a frame. Sets/DeckView still
+pass `shell=play` so those deep links skip the title. Needs `npm run
+aetherfield` in FND and a versioned release before installers see any of it.
 
-Service worker: `src/main.ts` registers `/sw.js` only at origin root and
-never when framed. That is load-bearing for the path proxy — a worker on
-filthy-net-deck.com/aetherfield/ would cache the marketing site
-(`Service-Worker-Allowed: /`). Do not loosen the pathname check.
-
-Next after both deploys: phase 3 — drop `?shell=play` in FND so the title,
-tour and settings show in-app (Install is already hidden when `isEmbedded()`).
-Then phase 4 ships with that FND release (Sets/DeckView deep links are
-already coded).
+Phase 2 (done): filthy-net-deck.com/aetherfield 200-proxies this origin.
+No slash-adding 301 (that looped). Service worker still registers only at
+origin root and never when framed — do not loosen that.
 
 **2026-09-05 — how this repo reaches Filthy Net Deck. Read before assuming.**
 
