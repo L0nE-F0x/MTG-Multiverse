@@ -7,6 +7,16 @@ import type { Universe } from '../data/universe.ts';
 import type { LayoutMode } from '../core/store.ts';
 
 /** Distance from the origin to the furthest point, over a flat xyz array. */
+function newestSetIndex(universe: Universe): number {
+  const sets = universe.meta.sets;
+  let best = -1;
+  let day = -1;
+  for (let i = 0; i < sets.length; i++) {
+    if (sets[i]!.released >= day) { day = sets[i]!.released; best = i; }
+  }
+  return best;
+}
+
 function boundingRadius(xyz: Float32Array): number {
   let maxSq = 0;
   for (let i = 0; i < xyz.length; i += 3) {
@@ -64,10 +74,14 @@ export class Starfield {
     const bright = new Float32Array(n);
     const seed = new Float32Array(n);
     const index = new Float32Array(n);
+    const oracle = new Float32Array(n);
+    const setIdx = new Float32Array(n);
+    const formatMask = new Float32Array(n);
+    const highlight = new Uint8Array(n);
     this.visPrev = new Uint8Array(n).fill(255);
     this.visNext = new Uint8Array(n).fill(255);
 
-    const { colorIdentity, typeMask, rarity, popularity } = universe.col;
+    const { colorIdentity, typeMask, rarity, popularity, oracleIdx, setIdx: setCol, formatMask: fmtCol } = universe.col;
     const rgb: RGB = [0, 0, 0];
 
     for (let i = 0; i < n; i++) {
@@ -84,6 +98,10 @@ export class Starfield {
       bright[i] = (0.30 + 0.95 * Math.pow(pop, 1.25)) * lum;
       seed[i] = Math.random();
       index[i] = i;
+      oracle[i] = oracleIdx[i]!;
+      setIdx[i] = setCol[i]!;
+      formatMask[i] = fmtCol[i]!;
+      highlight[i] = 0;
     }
 
     const g = new THREE.BufferGeometry();
@@ -94,6 +112,10 @@ export class Starfield {
     g.setAttribute('aBright', new THREE.BufferAttribute(bright, 1));
     g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
     g.setAttribute('aIndex', new THREE.BufferAttribute(index, 1));
+    g.setAttribute('aOracle', new THREE.BufferAttribute(oracle, 1));
+    g.setAttribute('aSetIdx', new THREE.BufferAttribute(setIdx, 1));
+    g.setAttribute('aFormatMask', new THREE.BufferAttribute(formatMask, 1));
+    g.setAttribute('aHighlight', new THREE.BufferAttribute(highlight, 1, true));
     g.setAttribute('aVisPrev', new THREE.BufferAttribute(this.visPrev, 1, true));
     g.setAttribute('aVisNext', new THREE.BufferAttribute(this.visNext, 1, true));
     this.geometry = g;
@@ -113,6 +135,11 @@ export class Starfield {
         uSelected: { value: -1 },
         uTwinkle: { value: 1 },
         uExposure: { value: 1 },
+        uHoverOracle: { value: -1 },
+        uSelectedOracle: { value: -1 },
+        uNewestSet: { value: newestSetIndex(universe) },
+        uFormatBit: { value: 0 },
+        uHighlightOn: { value: 0 },
       },
       transparent: true,
       depthTest: false,
@@ -126,6 +153,9 @@ export class Starfield {
   }
 
   get isMorphing(): boolean { return this.morphing; }
+
+  /** Radius of the sphere enclosing the current (target) layout. */
+  get boundingRadius(): number { return this.boundRadius; }
 
   /**
    * Distance at which the whole layout fits the vertical field of view.
@@ -184,6 +214,24 @@ export class Starfield {
     this.morph = 0;
     this.morphing = true;
     this.material.uniforms.uMorph.value = 0;
+  }
+
+  setHoverOracle(id: number): void { this.material.uniforms.uHoverOracle.value = id; }
+  setSelectedOracle(id: number): void { this.material.uniforms.uSelectedOracle.value = id; }
+  setFormatBit(bit: number): void { this.material.uniforms.uFormatBit.value = bit; }
+
+  /** Per-card highlight (collection / deck). `null` turns the pass off. */
+  setHighlight(mask: Uint8Array | null): void {
+    const attr = this.geometry.getAttribute('aHighlight') as THREE.BufferAttribute;
+    const arr = attr.array as Uint8Array;
+    if (!mask) {
+      arr.fill(0);
+      this.material.uniforms.uHighlightOn.value = 0;
+    } else {
+      arr.set(mask);
+      this.material.uniforms.uHighlightOn.value = 1;
+    }
+    attr.needsUpdate = true;
   }
 
   /** `mask[i] === 1` for cards passing the current filter. Crossfades in. */

@@ -19,8 +19,9 @@
  */
 import { defaultVisual, store, type VisualState } from './store.ts';
 
-/** Bump when the shape changes; an unknown version is discarded, not migrated. */
-const KEY = 'aetherfield.settings.v1';
+/** Bump when the shape or a default that old saves would fight changes.
+ *  v2: motion blur defaults off — v1 saves kept it on and ghosted the view. */
+const KEY = 'aetherfield.settings.v2';
 
 /** Debounce: a slider drag emits far faster than this is worth writing. */
 const WRITE_DELAY_MS = 400;

@@ -90,7 +90,7 @@ export class Universe {
    */
   applyFilter(f: FilterState, out: Uint8Array): number {
     const n = this.count;
-    const { colorIdentity, typeMask, rarity, formatMask, setIdx, cmc, flags } = this.col;
+    const { colorIdentity, typeMask, rarity, formatMask, setIdx, oracleIdx, cmc, flags } = this.col;
     const year = this.year;
 
     let colorMask = 0;
@@ -108,6 +108,7 @@ export class Universe {
 
     const rarityReq = f.rarities.size > 0 ? f.rarities : null;
     const setReq = f.sets.size > 0 ? f.sets : null;
+    const oracleReq = f.oracles.size > 0 ? f.oracles : null;
     const [y0, y1] = f.years;
     const [c0, c1] = f.cmc;
     const cmcOpen = c1 >= 30;
@@ -159,6 +160,7 @@ export class Universe {
       if (formatReq && !(formatMask[i] & formatReq)) { out[i] = 0; continue; }
       if (rarityReq && !rarityReq.has(rarity[i])) { out[i] = 0; continue; }
       if (setReq && !setReq.has(setIdx[i])) { out[i] = 0; continue; }
+      if (oracleReq && !oracleReq.has(oracleIdx[i])) { out[i] = 0; continue; }
       if (nameAllow && !nameAllow[nameIdx[i]]) { out[i] = 0; continue; }
 
       out[i] = 1;
@@ -221,6 +223,28 @@ export class Universe {
       return c;
     }
     return -1;
+  }
+
+  /** Oracle ids for an exact name (case-insensitive). */
+  oraclesNamed(name: string): number[] {
+    const want = name.trim().toLowerCase();
+    if (!want) return [];
+    const out: number[] = [];
+    const seen = new Set<number>();
+    for (let i = 0; i < this.lcNames.length; i++) {
+      if (this.lcNames[i] !== want) continue;
+      if (!this.nameToCards) this.buildNameIndex();
+      for (const c of this.nameToCards!.get(i) ?? []) {
+        const o = this.col.oracleIdx[c]!;
+        if (!seen.has(o)) { seen.add(o); out.push(o); }
+      }
+    }
+    return out;
+  }
+
+  indexOfSetCode(code: string): number {
+    const want = code.trim().toLowerCase();
+    return this.meta.sets.findIndex((s) => s.code.toLowerCase() === want);
   }
 
   /** Every printing of the card at index i, oldest first. */

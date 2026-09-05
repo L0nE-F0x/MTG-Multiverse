@@ -48,6 +48,8 @@ export class CardBillboards {
   private readonly loader = new THREE.TextureLoader();
   private readonly camPos = new THREE.Vector3();
   private readonly tmp = new THREE.Vector3();
+  private readonly raycaster = new THREE.Raycaster();
+  private readonly ndc = new THREE.Vector2();
 
   /** Scratch for candidate selection, reused to avoid per-frame allocation. */
   private readonly candIdx = new Int32Array(MAX_VISIBLE);
@@ -89,6 +91,28 @@ export class CardBillboards {
   setEnabled(v: boolean): void {
     this.enabled = v;
     if (!v) for (const s of this.slots) s.targetOpacity = 0;
+  }
+
+  /**
+   * Hit-test the visible card art. GPU picking only sees the star sprite, so
+   * clicking the face of a billboard used to miss. 48 sprites is cheap.
+   *
+   * `px`/`py` are CSS pixels from the canvas top-left.
+   */
+  hitTest(camera: THREE.PerspectiveCamera, px: number, py: number, cssW: number, cssH: number): number {
+    this.ndc.set((px / cssW) * 2 - 1, -(py / cssH) * 2 + 1);
+    this.raycaster.setFromCamera(this.ndc, camera);
+    let best = -1;
+    let bestDist = Infinity;
+    for (const slot of this.slots) {
+      if (!slot.sprite.visible || slot.opacity < 0.12 || slot.card < 0) continue;
+      const hits = this.raycaster.intersectObject(slot.sprite, false);
+      if (hits.length > 0 && hits[0]!.distance < bestDist) {
+        bestDist = hits[0]!.distance;
+        best = slot.card;
+      }
+    }
+    return best;
   }
 
   update(

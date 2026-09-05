@@ -2,8 +2,8 @@
  * Static HUD chrome: the top-left wordmark + live match count, and the
  * bottom-centre layout-mode switcher.
  */
-import { store } from '../core/store.ts';
-import type { LayoutMode } from '../core/store.ts';
+import { store, type LayoutMode } from '../core/store.ts';
+import type { FormatName } from '../data/format.ts';
 import type { Universe } from '../data/universe.ts';
 import { BRAND, BRAND_WORDMARK } from './brand.ts';
 import { el, fmtInt } from './dom.ts';
@@ -85,7 +85,28 @@ export function mountHud(root: HTMLElement, universe: Universe, hooks: HudHooks)
     buttons.set(mode, btn);
     segmented.append(btn);
   }
-  const switcherInner = el('div', { className: 'mcu-layout-switcher-inner' }, [segmented, descEl]);
+  const formatBtns = new Map<FormatName | '', HTMLButtonElement>();
+  const formatRow = el('div', {
+    className: 'mcu-format-row',
+    attrs: { role: 'group', 'aria-label': 'Arena format focus' },
+  });
+  const formats: { id: FormatName | ''; label: string }[] = [
+    { id: '', label: 'All' },
+    { id: 'standard', label: 'Standard' },
+    { id: 'pioneer', label: 'Pioneer' },
+  ];
+  for (const { id, label } of formats) {
+    const btn = el('button', {
+      className: 'mcu-format-btn',
+      text: label,
+      attrs: { type: 'button', 'aria-pressed': 'false' },
+    });
+    btn.addEventListener('click', () => store.set('formatFocus', id));
+    formatBtns.set(id, btn);
+    formatRow.append(btn);
+  }
+
+  const switcherInner = el('div', { className: 'mcu-layout-switcher-inner' }, [formatRow, segmented, descEl]);
   const switcher = el('div', { className: 'mcu-layout-switcher' }, [switcherInner]);
   root.append(switcher);
 
@@ -101,10 +122,22 @@ export function mountHud(root: HTMLElement, universe: Universe, hooks: HudHooks)
   paintLayout();
   const offLayout = store.on('layout', paintLayout);
 
+  function paintFormat(): void {
+    const current = store.state.formatFocus;
+    for (const [id, btn] of formatBtns) {
+      const active = id === current;
+      btn.classList.toggle('mcu-format-btn--active', active);
+      btn.setAttribute('aria-pressed', String(active));
+    }
+  }
+  paintFormat();
+  const offFormat = store.on('formatFocus', paintFormat);
+
   return {
     destroy() {
       offMatch();
       offLayout();
+      offFormat();
       commandBar.remove();
       switcher.remove();
     },

@@ -15,6 +15,9 @@ const isLayout = (v: string | null): v is LayoutMode =>
 
 const isShell = (v: string | null): v is ShellMode => v === 'title' || v === 'play';
 
+/** True when a host (or ?shell=play) asked us not to run the cinematic intro. */
+export let skipCinematic = false;
+
 export function connectUrlState(universe: Universe): () => void {
   const params = new URLSearchParams(window.location.search);
 
@@ -35,6 +38,32 @@ export function connectUrlState(universe: Universe): () => void {
   // clean `/?layout=…` and still opens on the title as it should.
   const pinShell = isShell(params.get('shell'));
   if (pinShell) store.set('shell', params.get('shell') as ShellMode);
+  skipCinematic = pinShell && params.get('shell') === 'play';
+
+  const setCode = params.get('set');
+  if (setCode) {
+    const idx = universe.indexOfSetCode(setCode);
+    if (idx >= 0) {
+      store.patchFilter({ sets: new Set([idx]) });
+      if (!isLayout(layout)) store.set('layout', 'sets');
+    } else console.warn(`[mcu] no set matches ?set=${setCode}`);
+  }
+
+  const cardsParam = params.get('cards');
+  if (cardsParam) {
+    const oracles = new Set<number>();
+    for (const token of cardsParam.split(',')) {
+      const t = token.trim();
+      if (!t) continue;
+      const i = universe.indexOfUuid(t);
+      if (i >= 0) oracles.add(universe.col.oracleIdx[i]!);
+      else for (const o of universe.oraclesNamed(decodeURIComponent(t))) oracles.add(o);
+    }
+    if (oracles.size > 0) {
+      store.patchFilter({ oracles });
+      store.set('highlightOracles', new Set(oracles));
+    }
+  }
 
   let queued = 0;
   const write = (): void => {
@@ -47,6 +76,11 @@ export function connectUrlState(universe: Universe): () => void {
       if (pinShell) next.set('shell', store.state.shell);
       if (store.state.layout !== 'galaxy') next.set('layout', store.state.layout);
       if (store.state.selected >= 0) next.set('card', universe.uuid(store.state.selected));
+      if (store.state.filter.sets.size === 1) {
+        const idx = [...store.state.filter.sets][0]!;
+        const code = universe.meta.sets[idx]?.code;
+        if (code) next.set('set', code);
+      }
       const qs = next.toString();
       const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
       window.history.replaceState(null, '', url);
@@ -55,6 +89,7 @@ export function connectUrlState(universe: Universe): () => void {
 
   const offSelected = store.on('selected', write);
   const offLayout = store.on('layout', write);
+  const offFilter = store.on('filter', write);
   // Only meaningful while the shell is pinned, but subscribing unconditionally
   // is cheaper than branching and the writer already ignores it otherwise.
   const offShell = store.on('shell', write);
@@ -62,6 +97,7 @@ export function connectUrlState(universe: Universe): () => void {
   return () => {
     offSelected();
     offLayout();
+    offFilter();
     offShell();
     if (queued) clearTimeout(queued);
   };

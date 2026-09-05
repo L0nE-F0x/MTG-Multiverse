@@ -2,7 +2,8 @@ import { store } from './core/store.ts';
 import { loadUniverse } from './data/universe.ts';
 import { App } from './core/App.ts';
 import { connectUrlState } from './core/urlState.ts';
-import { connectEmbed, isEmbedded, notifyHost } from './core/embed.ts';
+import { connectEmbed, isEmbedded, notifyHost, onHostMessage } from './core/embed.ts';
+import { defaultFilter } from './core/store.ts';
 import { connectSettingsPersistence, restoreSettings } from './core/persist.ts';
 
 /** Handles exposed by the UI layer; mirrored here so main does not hard-depend on it. */
@@ -58,10 +59,13 @@ async function main(): Promise<void> {
 
   // The UI layer is optional at runtime: if it fails to load, the galaxy still
   // flies. Keeps the renderer independently testable.
+  const camHost = {
+    cameraSnapshot: () => ({ theta: 0, phi: 1.07, radius: 900, target: [0, 0, 0] as [number, number, number] }),
+  };
   let ui: UIHandles | null = null;
   try {
     const mod = await import('./ui/index.ts');
-    ui = mod.mountUI(uiRoot, universe);
+    ui = mod.mountUI(uiRoot, universe, camHost);
   } catch (err) {
     console.warn('[mcu] UI layer unavailable, running renderer only:', err);
   }
@@ -75,7 +79,32 @@ async function main(): Promise<void> {
   const app = new App(canvas, universe, {
     onHoverAnchor: (p) => ui?.setHoverAnchor(p),
   });
+  camHost.cameraSnapshot = () => app.rig.snapshot();
   app.start();
+
+  onHostMessage((msg) => {
+    if (msg.type === 'clear-highlight') {
+      store.set('highlightOracles', new Set());
+      store.patchFilter({ oracles: defaultFilter().oracles });
+      return;
+    }
+    if (msg.type === 'show-set') {
+      const idx = universe.indexOfSetCode(msg.code);
+      if (idx < 0) return;
+      store.patchFilter({ sets: new Set([idx]) });
+      store.set('layout', 'sets');
+      return;
+    }
+    const oracles = new Set<number>();
+    for (const id of msg.uuids ?? []) {
+      const i = universe.indexOfUuid(id);
+      if (i >= 0) oracles.add(universe.col.oracleIdx[i]!);
+    }
+    for (const name of msg.names ?? []) {
+      for (const o of universe.oraclesNamed(name)) oracles.add(o);
+    }
+    store.set('highlightOracles', oracles);
+  });
 
   // Hold the overlay until two frames have actually rendered, so the reveal
   // never lands on a blank canvas while shaders are still compiling.
@@ -92,12 +121,16 @@ async function main(): Promise<void> {
 
   Object.assign(window as unknown as Record<string, unknown>, { __mcu: { app, universe, store, ui } });
 
-  // The service worker belongs to the public site only. Embedded in a host
-  // app the page is served from that app's bundle, where registration either
-  // throws outright or quietly starts caching assets on the host's origin.
-  const ownsOrigin = !isEmbedded() && location.protocol.startsWith('http');
+  // The service worker belongs to the public site at its origin root.
+  // Framed inside FND it would cache the host's assets. Served under
+  // filthy-net-deck.com/aetherfield/ it would claim that origin (sw.js is
+  // root-absolute and Netlify sends Service-Worker-Allowed: /). Pathname
+  // must be `/` — `isEmbedded()` only means "inside an iframe".
+  const atSiteRoot = location.pathname === '/' || location.pathname === '/index.html';
+  const ownsOrigin = !isEmbedded() && location.protocol.startsWith('http') && atSiteRoot;
   if (import.meta.env.PROD && ownsOrigin && 'serviceWorker' in navigator) {
-    void navigator.serviceWorker.register('/sw.js').catch(() => {});
+    const swUrl = new URL('sw.js', document.baseURI).href;
+    void navigator.serviceWorker.register(swUrl).catch(() => {});
   }
 }
 

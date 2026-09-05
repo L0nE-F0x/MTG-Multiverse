@@ -34,6 +34,12 @@ export type HostMessage =
   /** Open this in the system browser — see the note on `target="_blank"`. */
   | { type: 'open-external'; url: string };
 
+/** Parent → frame. Same channel tag so we can ignore everyone else. */
+export type InboundMessage =
+  | { type: 'highlight'; names?: string[]; uuids?: string[] }
+  | { type: 'show-set'; code: string }
+  | { type: 'clear-highlight' };
+
 /** What the host actually receives. Tagged so it can ignore other traffic. */
 export type ChannelMessage = HostMessage & { source: typeof EMBED_CHANNEL };
 
@@ -104,4 +110,19 @@ export function connectEmbed(): () => void {
 
   document.addEventListener('click', onClick, true);
   return () => document.removeEventListener('click', onClick, true);
+}
+
+export function onHostMessage(handler: (msg: InboundMessage) => void): () => void {
+  if (!isEmbedded()) return () => {};
+  const onMessage = (event: MessageEvent): void => {
+    const data = event.data;
+    if (!data || typeof data !== 'object') return;
+    if ((data as { source?: unknown }).source !== EMBED_CHANNEL) return;
+    const type = (data as { type?: unknown }).type;
+    if (type === 'highlight' || type === 'show-set' || type === 'clear-highlight') {
+      handler(data as InboundMessage);
+    }
+  };
+  window.addEventListener('message', onMessage);
+  return () => window.removeEventListener('message', onMessage);
 }

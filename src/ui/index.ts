@@ -5,9 +5,12 @@
  */
 import '../styles/base.css';
 import type { Universe } from '../data/universe.ts';
+import { mountBookmarks } from './bookmarks.ts';
 import { mountCardPanel } from './cardPanel.ts';
+import { mountCinematic } from './cinematic.ts';
 import { mountFilters } from './filters.ts';
 import { mountHud } from './hud.ts';
+import { mountMinimap } from './minimap.ts';
 import { mountSearch } from './search.ts';
 import { mountSettings } from './settings.ts';
 import { mountTitle } from './title.ts';
@@ -24,7 +27,11 @@ export interface UIHandles {
   destroy(): void;
 }
 
-export function mountUI(root: HTMLElement, universe: Universe): UIHandles {
+export interface UIHost {
+  cameraSnapshot(): { theta: number; phi: number; radius: number; target: [number, number, number] };
+}
+
+export function mountUI(root: HTMLElement, universe: Universe, host?: UIHost): UIHandles {
   root.classList.add('mcu-root');
 
   // Set before anything measures itself. `filters` re-reports its footprint on
@@ -49,6 +56,11 @@ export function mountUI(root: HTMLElement, universe: Universe): UIHandles {
   const filters = mountFilters(root, universe);
   const cardPanel = mountCardPanel(root, universe);
   const tooltip = mountTooltip(root, universe);
+  const minimap = mountMinimap(root);
+  const cinematic = mountCinematic(root);
+  const bookmarks = mountBookmarks(root, {
+    cameraSnapshot: () => host?.cameraSnapshot() ?? { theta: 0, phi: 1.07, radius: 900, target: [0, 0, 0] },
+  });
 
   return {
     setHoverAnchor(p) {
@@ -66,6 +78,9 @@ export function mountUI(root: HTMLElement, universe: Universe): UIHandles {
       filters.destroy();
       cardPanel.destroy();
       tooltip.destroy();
+      minimap.destroy();
+      cinematic.destroy();
+      bookmarks.destroy();
       settings.destroy();
       root.classList.remove('mcu-root');
     },

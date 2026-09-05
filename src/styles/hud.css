@@ -107,8 +107,33 @@
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  pointer-events: auto;
+  pointer-events: none;
   animation: mcu-panel-in 500ms var(--mcu-ease) both;
+}
+.mcu-format-row {
+  display: flex;
+  gap: 2px;
+  background: var(--mcu-panel-bg);
+  border: 1px solid var(--mcu-border);
+  border-radius: 8px;
+  padding: 3px;
+  pointer-events: none;
+}
+.mcu-format-btn {
+  background: transparent;
+  border: none;
+  color: var(--mcu-text-dim);
+  padding: 5px 10px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 6px;
+  pointer-events: auto;
+}
+.mcu-format-btn--active {
+  color: var(--mcu-text);
+  background: rgba(94, 231, 255, 0.12);
 }
 .mcu-layout-segmented {
   display: flex;
@@ -130,6 +155,7 @@
   text-transform: uppercase;
   border-radius: 7px;
   cursor: pointer;
+  pointer-events: auto;
   transition: all 200ms var(--mcu-ease);
 }
 .mcu-layout-btn:hover {

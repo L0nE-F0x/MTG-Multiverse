@@ -14,6 +14,9 @@ const TAU = Math.PI * 2;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
 export const GALAXY_RADIUS = 320;
+export const GALAXY_CORE = 30;
+export const TIMELINE_R0 = 40;
+export const TIMELINE_RING = 22;
 
 /** Integer hash -> [0,1). Deterministic, so layouts are stable across reloads. */
 function hash(n: number): number {
@@ -31,7 +34,7 @@ function gauss(n: number, salt: number): number {
 }
 
 /** The five colours sit on a pentagon in WUBRG order — Magic's own colour wheel. */
-const COLOR_ANGLE: Record<number, number> = {
+export const COLOR_ANGLE: Record<number, number> = {
   [COLOR_BIT.W]: 0,
   [COLOR_BIT.U]: TAU / 5,
   [COLOR_BIT.B]: (2 * TAU) / 5,
@@ -182,7 +185,7 @@ function galaxy(ctx: LayoutContext, out: Float32Array): void {
 
   const TWIST = 0.0092;
   const ARM_SIGMA = 0.19;
-  const CORE = 30;
+  const CORE = GALAXY_CORE;
 
   for (let i = 0; i < n; i++) {
     const id = IDENTITY_TABLE[colorIdentity[i] & 31];
@@ -251,8 +254,8 @@ function timeline(ctx: LayoutContext, out: Float32Array): void {
   const n = universe.count;
   const { cmc, releaseDay } = universe.col;
 
-  const R0 = 40;
-  const RING = 22;   // radial gap between year rings
+  const R0 = TIMELINE_R0;
+  const RING = TIMELINE_RING;   // radial gap between year rings
 
   for (let i = 0; i < n; i++) {
     const year = releaseDayToYear(releaseDay[i]);
@@ -273,6 +276,31 @@ function timeline(ctx: LayoutContext, out: Float32Array): void {
   }
 }
 
+/** Spacing of the set-cluster phyllotaxis; the nebula bake uses the same. */
+export const SET_CLUSTER_SPACING = 26;
+
+/**
+ * One cluster per set: xyz centre and radius, packed as `[x,y,z,r, …]`.
+ * Shared by the sets layout and the nebula so the gas sits on the same
+ * clusters the stars do.
+ */
+export function setClusterAttribs(ctx: LayoutContext): Float32Array {
+  const { setOrder } = ctx;
+  const setList = ctx.universe.meta.sets;
+  const out = new Float32Array(setList.length * 4);
+  for (let s = 0; s < setList.length; s++) {
+    const k = setOrder[s];
+    const r = SET_CLUSTER_SPACING * Math.sqrt(k + 0.5);
+    const a = k * GOLDEN_ANGLE;
+    const o = s * 4;
+    out[o] = Math.cos(a) * r;
+    out[o + 1] = (hash(s * 9176) - 0.5) * 42 + (setList[s].type % 5) * 16 - 32;
+    out[o + 2] = Math.sin(a) * r;
+    out[o + 3] = 3 + 2.1 * Math.cbrt(Math.max(1, setList[s].count));
+  }
+  return out;
+}
+
 /**
  * Every set becomes its own globular cluster, laid out on a phyllotaxis spiral
  * in release order. Cluster radius follows the cube root of its card count, so
@@ -280,41 +308,28 @@ function timeline(ctx: LayoutContext, out: Float32Array): void {
  * a 60-card starter deck.
  */
 function sets(ctx: LayoutContext, out: Float32Array): void {
-  const { universe, setOrder } = ctx;
+  const { universe } = ctx;
   const n = universe.count;
   const setIdxCol = universe.col.setIdx;
-  const setList = universe.meta.sets;
-
-  const cx = new Float32Array(setList.length);
-  const cy = new Float32Array(setList.length);
-  const cz = new Float32Array(setList.length);
-  const cr = new Float32Array(setList.length);
-  const SPACING = 26;
-
-  for (let s = 0; s < setList.length; s++) {
-    const k = setOrder[s];
-    const r = SPACING * Math.sqrt(k + 0.5);
-    const a = k * GOLDEN_ANGLE;
-    cx[s] = Math.cos(a) * r;
-    cz[s] = Math.sin(a) * r;
-    // Lift by set type so expansions, masters and joke sets separate vertically.
-    cy[s] = (hash(s * 9176) - 0.5) * 42 + (setList[s].type % 5) * 16 - 32;
-    cr[s] = 3 + 2.1 * Math.cbrt(Math.max(1, setList[s].count));
-  }
+  const clusters = setClusterAttribs(ctx);
 
   for (let i = 0; i < n; i++) {
     const s = setIdxCol[i];
+    const cx = clusters[s * 4]!;
+    const cy = clusters[s * 4 + 1]!;
+    const cz = clusters[s * 4 + 2]!;
+    const cr = clusters[s * 4 + 3]!;
     // Uniform inside the sphere: cube root of the radial sample.
     const u = hash2(i, 23);
-    const rad = cr[s] * Math.cbrt(u);
+    const rad = cr * Math.cbrt(u);
     const phi = Math.acos(2 * hash2(i, 29) - 1);
     const th = hash2(i, 31) * TAU;
     const sp = Math.sin(phi);
 
     const o = i * 3;
-    out[o] = cx[s] + rad * sp * Math.cos(th);
-    out[o + 1] = cy[s] + rad * Math.cos(phi);
-    out[o + 2] = cz[s] + rad * sp * Math.sin(th);
+    out[o] = cx + rad * sp * Math.cos(th);
+    out[o + 1] = cy + rad * Math.cos(phi);
+    out[o + 2] = cz + rad * sp * Math.sin(th);
   }
 }
 

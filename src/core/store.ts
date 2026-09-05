@@ -4,6 +4,7 @@
  * and subscribes. Neither imports the other.
  */
 import type { ColorLetter, FormatName, TypeName } from '../data/format.ts';
+export type { ColorLetter, FormatName };
 
 export type LayoutMode =
   | 'galaxy'    // spiral arms by colour, radius by release date  (the default)
@@ -37,7 +38,16 @@ export interface FilterState {
   hideReprints: boolean;
   hideDigital: boolean;
   hideTokens: boolean;
+  /** Empty = no constraint. Oracle ids for a deck / collection deep link. */
+  oracles: Set<number>;
 }
+
+/** UI → camera: the renderer consumes this and clears it. */
+export type CameraCue =
+  | { kind: 'arm'; color: ColorLetter }
+  | { kind: 'cinematic' }
+  | { kind: 'skip-cinematic' }
+  | { kind: 'bookmark'; theta: number; phi: number; radius: number; target: [number, number, number] };
 
 export interface VisualState {
   bloom: number;
@@ -95,6 +105,13 @@ export interface AppState {
   stats: Stats;
   /** Canvas area covered by UI. See ViewInsets. */
   insets: ViewInsets;
+  /** Arena format to emphasise; empty = all equal. */
+  formatFocus: FormatName | '';
+  /** Consumed by the renderer, then set back to null. */
+  cameraCue: CameraCue | null;
+  cinematic: boolean;
+  /** Oracle ids to lift (collection / deck). Empty = no highlight pass. */
+  highlightOracles: Set<number>;
 }
 
 export function defaultFilter(): FilterState {
@@ -112,6 +129,7 @@ export function defaultFilter(): FilterState {
     hideReprints: false,
     hideDigital: false,
     hideTokens: true,
+    oracles: new Set(),
   };
 }
 
@@ -127,7 +145,7 @@ export function defaultVisual(): VisualState {
     nebula: 1.0,
     showNebula: true,
     showLabels: true,
-    motionBlur: true,
+    motionBlur: false,
     dimFiltered: 0.018,
     autoRotate: true,
   };
@@ -153,6 +171,10 @@ class Store {
     matchCount: 0,
     stats: { fps: 0, visible: 0, total: 0, drawCalls: 0, ms: 0 },
     insets: defaultInsets(),
+    formatFocus: '',
+    cameraCue: null,
+    cinematic: false,
+    highlightOracles: new Set(),
   };
 
   private listeners = new Map<StateKey, Set<Listener<never>>>();

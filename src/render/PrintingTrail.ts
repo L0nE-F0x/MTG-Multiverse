@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { Line2 } from 'three/examples/jsm/lines/Line2.js';
+import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { starColor, type RGB } from '../layout/palette.ts';
 import type { Universe } from '../data/universe.ts';
 import type { Starfield } from './Starfield.ts';
@@ -31,11 +34,11 @@ const MAX_POINTS = 64;
 const FADE_SECONDS = 0.5;
 
 export class PrintingTrail {
-  readonly line: THREE.Line;
+  readonly line: Line2;
 
   private readonly positions: Float32Array;
-  private readonly geometry: THREE.BufferGeometry;
-  private readonly material: THREE.LineBasicMaterial;
+  private readonly geometry: LineGeometry;
+  private readonly material: LineMaterial;
   private readonly tmp = new THREE.Vector3();
 
   /** Card indices currently threaded, oldest first. */
@@ -50,23 +53,31 @@ export class PrintingTrail {
   ) {
     this.positions = new Float32Array(MAX_POINTS * 3);
 
-    this.geometry = new THREE.BufferGeometry();
-    this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
-    this.geometry.setDrawRange(0, 0);
+    this.geometry = new LineGeometry();
+    this.geometry.setPositions(Array.from(this.positions));
 
-    this.material = new THREE.LineBasicMaterial({
+    this.material = new LineMaterial({
+      color: 0xffffff,
+      linewidth: 2.8,
       transparent: true,
       opacity: 0,
       depthTest: false,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
+      dashed: false,
+      worldUnits: false,
     });
+    this.material.depthWrite = false;
+    this.material.blending = THREE.AdditiveBlending;
+    this.material.resolution.set(1, 1);
 
-    this.line = new THREE.Line(this.geometry, this.material);
+    this.line = new Line2(this.geometry, this.material);
     this.line.frustumCulled = false;
     this.line.visible = false;
     // Above the stars, below the card art and labels.
     this.line.renderOrder = 15;
+  }
+
+  setSize(width: number, height: number): void {
+    this.material.resolution.set(Math.max(1, width), Math.max(1, height));
   }
 
   /**
@@ -104,7 +115,11 @@ export class PrintingTrail {
     starColor(this.universe.col.colorIdentity[card], this.universe.col.typeMask[card], rgb);
     // Lifted well above 1: this is additive over a bright field, and the post
     // chain's ACES curve pulls anything subtler back down to invisible.
-    this.material.color.setRGB(rgb[0] * 2.0, rgb[1] * 2.0, rgb[2] * 2.0);
+    this.material.color.setRGB(
+      Math.min(1, rgb[0] * 1.35 + 0.15),
+      Math.min(1, rgb[1] * 1.35 + 0.15),
+      Math.min(1, rgb[2] * 1.35 + 0.15),
+    );
 
     this.targetOpacity = this.layoutSupported ? 1 : 0;
   }
@@ -112,25 +127,25 @@ export class PrintingTrail {
   update(dt: number): void {
     const k = 1 - Math.exp(-dt / (FADE_SECONDS / 4));
     this.opacity += (this.targetOpacity - this.opacity) * k;
-    this.material.opacity = this.opacity * 0.7;
+    this.material.opacity = this.opacity * 0.92;
 
     const showing = this.opacity > 0.01 && this.points.length >= 2;
     this.line.visible = showing;
-    if (!showing) {
-      if (this.targetOpacity === 0) this.geometry.setDrawRange(0, 0);
-      return;
-    }
+    if (!showing) return;
 
     // Re-read every frame so the thread follows a layout morph rather than
     // hanging in the positions the cards used to occupy.
-    for (let i = 0; i < this.points.length; i++) {
-      this.starfield.positionOf(this.points[i], this.tmp);
+    const n = this.points.length;
+    for (let i = 0; i < n; i++) {
+      this.starfield.positionOf(this.points[i]!, this.tmp);
       this.positions[i * 3] = this.tmp.x;
       this.positions[i * 3 + 1] = this.tmp.y;
       this.positions[i * 3 + 2] = this.tmp.z;
     }
-    this.geometry.getAttribute('position').needsUpdate = true;
-    this.geometry.setDrawRange(0, this.points.length);
+    // LineGeometry expects a packed xyz array of the used points only.
+    const packed = n === MAX_POINTS ? this.positions : this.positions.subarray(0, n * 3);
+    this.geometry.setPositions(Array.from(packed));
+    this.line.computeLineDistances();
   }
 
   dispose(): void {

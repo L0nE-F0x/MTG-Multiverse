@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CameraRig } from './CameraRig.ts';
-import { store, type LayoutMode, type VisualState } from './store.ts';
+import { store, type CameraCue, type LayoutMode, type VisualState } from './store.ts';
 import { Starfield } from '../render/Starfield.ts';
 import { Nebula } from '../render/Nebula.ts';
 import { Picker } from '../render/Picker.ts';
@@ -8,7 +8,12 @@ import { CardBillboards } from '../render/CardBillboards.ts';
 import { StarLabels } from '../render/StarLabels.ts';
 import { CoreGlow } from '../render/CoreGlow.ts';
 import { PrintingTrail } from '../render/PrintingTrail.ts';
+import { EraMarkers } from '../render/EraMarkers.ts';
 import { createPostChain, type PostChain } from '../render/post.ts';
+import { isEmbedded } from './embed.ts';
+import { skipCinematic } from './urlState.ts';
+import { COLOR_BIT, FORMAT_BIT } from '../data/format.ts';
+import { COLOR_ANGLE, setClusterAttribs } from '../layout/layouts.ts';
 import type { Universe } from '../data/universe.ts';
 
 const FOV = 55;
@@ -50,6 +55,7 @@ export class App {
   private readonly labels: StarLabels;
   private readonly coreGlow = new CoreGlow();
   private readonly printingTrail: PrintingTrail;
+  private readonly eraMarkers: EraMarkers;
   private readonly post: PostChain;
   private readonly universe: Universe;
   private readonly canvas: HTMLCanvasElement;
@@ -74,6 +80,12 @@ export class App {
   private renderScale = 1;
   private tierCooldown = 0;
   private disposers: (() => void)[] = [];
+  /** Galaxy layout's bounding radius, captured at boot. Other layouts scale the nebula against this. */
+  private galaxyBound = 1;
+  private worldScale = 1;
+  private targetWorldScale = 1;
+  /** Last time a camera-driven pick was queued. Pointer moves stay immediate. */
+  private lastCameraPick = 0;
 
   constructor(canvas: HTMLCanvasElement, universe: Universe, options: AppOptions = {}) {
     this.canvas = canvas;
@@ -102,19 +114,33 @@ export class App {
     this.billboards = new CardBillboards(universe, this.starfield, this.mask);
     this.labels = new StarLabels(universe, this.starfield, this.mask);
     this.printingTrail = new PrintingTrail(universe, this.starfield);
+    this.eraMarkers = new EraMarkers(universe);
 
     this.scene.add(this.nebula.compositeMesh);
     this.scene.add(this.starfield.points);
     this.scene.add(this.billboards.group);
     this.scene.add(this.labels.group);
     this.scene.add(this.coreGlow.group);
+    this.scene.add(this.eraMarkers.group);
     this.scene.add(this.printingTrail.line);
 
     this.post = createPostChain(this.renderer, this.scene, this.camera);
 
     this.bindEvents();
     this.bindStore();
+    this.galaxyBound = Math.max(1, this.starfield.boundingRadius);
+    this.nebula.setLayout('galaxy', {
+      bound: this.galaxyBound,
+      yearMin: this.starfield.ctx.yearMin,
+      yearMax: this.starfield.ctx.yearMax,
+    });
+    // Start below the top of the ladder and climb if the machine has headroom.
+    // Booting at max raymarch cost made the first few seconds of flight the
+    // heaviest, which is exactly when a host webview looks like it "can't run
+    // this". Embedded views (Tauri) start one step lower still.
+    this.tier = isEmbedded() ? 1 : 2;
     this.resize();
+    this.applyQuality();
 
     // Cinematic arrival: start far enough out that the galaxy is a distant
     // smudge, then ease in. The low seeded damping relaxes back to normal over
@@ -126,6 +152,7 @@ export class App {
     this.rig.flyTo(new THREE.Vector3(0, 0, 0), framed, 0.62);
     this.applyVisual(store.state.visual);
     this.applyFilter();
+    this.applyHighlight();
   }
 
   /** Current quality tier, 0 (cheapest) to TOP_TIER. Diagnostics only. */
@@ -199,7 +226,15 @@ export class App {
 
     add<KeyboardEvent>(window, 'keydown', (e) => {
       if (store.state.shell === 'title') return;
-      if (e.key === 'Escape') { store.set('selected', -1); return; }
+      if (e.key === 'Escape') {
+        if (this.rig.isCinematic) {
+          this.rig.skipCinematic();
+          store.set('cinematic', false);
+          return;
+        }
+        store.set('selected', -1);
+        return;
+      }
 
       // Never steal keys from a text field.
       const el = document.activeElement as HTMLElement | null;
@@ -235,9 +270,27 @@ export class App {
       }),
       store.on('visual', (v) => this.applyVisual(v)),
       store.on('selected', (i) => this.applySelection(i)),
+      store.on('hovered', (i) => {
+        this.starfield.setHoverOracle(i >= 0 ? this.universe.col.oracleIdx[i]! : -1);
+      }),
+      store.on('formatFocus', (fmt) => {
+        this.starfield.setFormatBit(fmt ? FORMAT_BIT[fmt] : 0);
+      }),
+      store.on('highlightOracles', () => this.applyHighlight()),
+      store.on('cameraCue', (cue) => this.consumeCue(cue)),
       store.on('shell', (mode) => {
         this.rig.setInputEnabled(mode === 'play');
         this.labels.setEnabled(store.state.visual.showLabels && mode === 'play');
+        this.eraMarkers.setEnabled(mode === 'play');
+        const automated = navigator.webdriver === true;
+        if (mode === 'play' && !skipCinematic && !isEmbedded() && !automated) {
+          this.rig.playCinematic(this.framedDistance(), this.starfield.framePhi(), 45);
+          store.set('cinematic', true);
+        }
+        if (mode === 'title') {
+          this.rig.skipCinematic();
+          store.set('cinematic', false);
+        }
       }),
       // Collapsing the filter panel hands back a third of the width. Re-offset
       // the projection and re-fit, so the layout drifts out to fill the space
@@ -286,6 +339,14 @@ export class App {
 
   private applyLayout(mode: LayoutMode): void {
     this.starfield.setLayout(mode);
+    this.targetWorldScale = this.starfield.boundingRadius / this.galaxyBound;
+    this.eraMarkers.setLayout(mode);
+    this.nebula.setLayout(mode, {
+      bound: this.starfield.boundingRadius,
+      yearMin: this.starfield.ctx.yearMin,
+      yearMax: this.starfield.ctx.yearMax,
+      clusters: mode === 'sets' ? setClusterAttribs(this.starfield.ctx) : undefined,
+    });
     // Reframe only if the user is looking at the whole thing; if they are down
     // among the stars, leave them where they are.
     if (this.rig.distance > 260) {
@@ -311,7 +372,14 @@ export class App {
       return;
     }
     const mode = store.state.layout;
-    const layout = mode === 'galaxy' ? 1 : mode === 'price' ? 0.8 : 0.09;
+    // The colourful disc is the nicest thing in the picture; keep it present
+    // in every layout, scaled to that layout's size. Galaxy stays the densest.
+    const layout =
+      mode === 'galaxy' ? 1 :
+      mode === 'sets' ? 0.42 :
+      mode === 'timeline' ? 0.7 :
+      0.75;
+    const core = mode === 'galaxy' ? 1 : 0.45;
 
     // Linear in the visible fraction, with a floor so a narrow filter still
     // leaves the galaxy's shape faintly legible rather than cutting to black.
@@ -321,9 +389,7 @@ export class App {
     const populated = 0.12 + 0.88 * fraction;
 
     this.nebula.setDensity(layout * populated);
-    this.coreGlow.setStrength(
-      (mode === 'galaxy' ? 1 : mode === 'price' ? 0.55 : 0) * populated,
-    );
+    this.coreGlow.setStrength(core * populated);
   }
 
   private applyFilter(): void {
@@ -351,14 +417,51 @@ export class App {
     this.labels.setEnabled(v.showLabels && store.state.shell === 'play');
   }
 
+  private applyHighlight(): void {
+    const wanted = store.state.highlightOracles;
+    if (wanted.size === 0) {
+      this.starfield.setHighlight(null);
+      return;
+    }
+    const mask = new Uint8Array(this.universe.count);
+    const oracles = this.universe.col.oracleIdx;
+    for (let i = 0; i < this.universe.count; i++) {
+      if (wanted.has(oracles[i]!)) mask[i] = 255;
+    }
+    this.starfield.setHighlight(mask);
+  }
+
+  private consumeCue(cue: CameraCue | null): void {
+    if (!cue) return;
+    if (cue.kind === 'skip-cinematic') {
+      this.rig.skipCinematic();
+      store.set('cinematic', false);
+    } else if (cue.kind === 'cinematic') {
+      this.rig.playCinematic(this.framedDistance(), this.starfield.framePhi(), 45);
+      store.set('cinematic', true);
+    } else if (cue.kind === 'bookmark') {
+      this.rig.restore(cue);
+    } else if (cue.kind === 'arm') {
+      const world = COLOR_ANGLE[COLOR_BIT[cue.color]] ?? 0;
+      this.rig.setAngles(Math.PI / 2 - world, this.starfield.framePhi());
+      this.rig.frame(this.framedDistance());
+    }
+    store.set('cameraCue', null);
+  }
+
   private applySelection(i: number): void {
     this.starfield.material.uniforms.uSelected.value = i;
     this.printingTrail.setCard(i);
-    if (i < 0) return;
+    if (i < 0) {
+      this.starfield.setSelectedOracle(-1);
+      return;
+    }
+    this.starfield.setSelectedOracle(this.universe.col.oracleIdx[i]!);
     this.starfield.positionOf(i, this.tmpVec);
     // Always close the distance on select, so picking a search result on the
     // far rim actually takes you there rather than nudging the pivot.
-    this.rig.flyTo(this.tmpVec, Math.min(this.rig.distance, 120), 2.6);
+    // Damping 1.45 is a long, readable flight — search "flies you there".
+    this.rig.flyTo(this.tmpVec, Math.min(this.rig.distance, 120), 1.45);
   }
 
   /**
@@ -383,7 +486,10 @@ export class App {
 
   private resize(): void {
     const { cssW, cssH, insetLeft } = this.viewport();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2) * this.renderScale;
+    // Host webviews (Tauri) often sit on a retina panel and an iGPU at once.
+    // Capping DPR there cuts fill-rate without touching the public site.
+    const dprCap = isEmbedded() ? 1.25 : 1.5;
+    const dpr = Math.min(window.devicePixelRatio || 1, dprCap) * this.renderScale;
 
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(cssW, cssH, false);
@@ -414,6 +520,7 @@ export class App {
 
     this.post.setSize(cssW, cssH);
     this.nebula.setSize(cssW * dpr, cssH * dpr);
+    this.printingTrail.setSize(cssW, cssH);
     // gl_PointSize is in framebuffer pixels, so the starfield scales by dpr;
     // the picker deliberately does not.
     this.starfield.setViewport(cssH * dpr, FOV);
@@ -426,6 +533,9 @@ export class App {
 
     this.rig.update(dt);
     this.starfield.update(dt, time);
+    this.worldScale += (this.targetWorldScale - this.worldScale) * (1 - Math.exp(-dt * 2.2));
+    this.nebula.setWorldScale(this.worldScale);
+    this.coreGlow.setWorldScale(Math.min(1.25, this.worldScale));
     this.nebula.update(dt);
 
     this.billboards.update(
@@ -433,9 +543,13 @@ export class App {
     );
     this.labels.update(dt, this.camera, this.rig.distance);
     this.coreGlow.update(dt);
+    this.eraMarkers.update(dt, this.camera);
     this.printingTrail.update(dt);
 
+    const moving = this.rig.idleSeconds < 0.35 || this.starfield.isMorphing || this.rig.isCinematic;
+    this.nebula.prepareFrame(this.camera, this.rig.distance, this.starfield.boundingRadius, moving);
     this.nebula.render(this.renderer, this.camera, time);
+    if (store.state.cinematic && !this.rig.isCinematic) store.set('cinematic', false);
     this.post.composer.render(dt);
 
     // Re-pick when the camera moves, not only when the pointer does. The star
@@ -444,19 +558,39 @@ export class App {
     if (this.pointerInside) {
       const pose = `${this.rig.distance.toFixed(1)}|${this.rig.target.x.toFixed(1)},${this.rig.target.y.toFixed(1)},${this.rig.target.z.toFixed(1)}|${this.camera.position.x.toFixed(1)},${this.camera.position.y.toFixed(1)},${this.camera.position.z.toFixed(1)}`;
       if (pose !== this.lastPickPose) {
-        this.lastPickPose = pose;
-        this.picker.request(this.lastPointer.x, this.lastPointer.y);
+        // Auto-rotate plus a pointer sitting over the canvas used to re-pick
+        // every frame — a second 117k-vertex pass, scissored or not. Pointer
+        // moves still pick immediately; camera-only picks settle at ~14 Hz.
+        const now = performance.now();
+        if (now - this.lastCameraPick > 100) {
+          this.lastPickPose = pose;
+          this.lastCameraPick = now;
+          this.picker.request(this.lastPointer.x, this.lastPointer.y);
+        }
       }
     }
 
-    this.picker.poll(this.renderer, this.camera, (index) => {
-      const valid = index >= 0 && index < this.universe.count && this.pointerInside;
-      const next = valid ? index : -1;
-      if (next !== store.state.hovered) {
-        store.set('hovered', next);
-        this.starfield.material.uniforms.uHovered.value = next;
+    if (this.pointerInside) {
+      const { cssW, cssH } = this.viewport();
+      const billboard = this.billboards.hitTest(
+        this.camera, this.lastPointer.x, this.lastPointer.y, cssW, cssH,
+      );
+      if (billboard >= 0) {
+        if (billboard !== store.state.hovered) {
+          store.set('hovered', billboard);
+          this.starfield.material.uniforms.uHovered.value = billboard;
+        }
+      } else {
+        this.picker.poll(this.renderer, this.camera, (index) => {
+          const valid = index >= 0 && index < this.universe.count;
+          const next = valid ? index : -1;
+          if (next !== store.state.hovered) {
+            store.set('hovered', next);
+            this.starfield.material.uniforms.uHovered.value = next;
+          }
+        });
       }
-    });
+    }
 
     this.updateHoverAnchor();
     this.updateStats(dt);
@@ -509,12 +643,12 @@ export class App {
     // A morph or a filter crossfade briefly costs extra; do not down-rank on it.
     if (this.starfield.isMorphing) return;
 
-    if (fps < 38 && this.tier > 0) {
+    if (fps < 42 && this.tier > 0) {
       // Drop proportionally to the shortfall. Stepping one level at a time with
       // a long cooldown meant that flying into the dense core — the single
       // heaviest thing you can do — took the better part of twenty seconds to
       // recover from, which is exactly when it is most noticeable.
-      const deficit = 38 - fps;
+      const deficit = 42 - fps;
       const steps = deficit > 16 ? 3 : deficit > 8 ? 2 : 1;
       this.tier = Math.max(0, this.tier - steps);
       this.tierCooldown = 1.6;
@@ -549,6 +683,7 @@ export class App {
     this.billboards.dispose();
     this.labels.dispose();
     this.coreGlow.dispose();
+    this.eraMarkers.dispose();
     this.printingTrail.dispose();
     this.post.dispose();
     this.renderer.dispose();

@@ -1,0 +1,18 @@
+.mcu-cinematic-skip {
+  position: absolute;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  z-index: 30;
+  padding: 8px 16px;
+  border: 1px solid var(--mcu-border-strong);
+  background: rgba(9, 11, 22, 0.92);
+  color: var(--mcu-text);
+  font: 600 11px/1 var(--mcu-font);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.mcu-cinematic-skip[hidden] { display: none; }
+.mcu-cinematic-skip:hover { color: var(--mcu-cyan); }

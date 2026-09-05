@@ -28,6 +28,7 @@ export class CoreGlow {
   private strength = 1;
   private target = 1;
   private time = 0;
+  private worldScale = 1;
 
   constructor() {
     this.texture = radialTexture(256);
@@ -62,19 +63,21 @@ export class CoreGlow {
   /** Eased, so it does not pop when the layout changes. */
   setStrength(v: number): void { this.target = v; }
 
+  /** Uniform scale relative to the galaxy layout (1 = galaxy). */
+  setWorldScale(v: number): void { this.worldScale = Math.max(0.05, v); }
+
   update(dt: number): void {
     this.time += dt;
     this.strength += (this.target - this.strength) * (1 - Math.exp(-dt * 2.2));
 
     for (let i = 0; i < this.layers.length; i++) {
       const layer = this.layers[i];
-      layer.material.opacity = layer.baseOpacity * this.strength;
       layer.sprite.visible = this.strength > 0.01;
-      // A slow breath keeps it alive without reading as a flicker. The rate is
-      // per-layer and deliberate — deriving it from `spin` made the period
-      // around ninety seconds, which is indistinguishable from static.
-      const breathe = 1 + Math.sin(this.time * (0.34 + i * 0.11) + i * 2.1) * 0.028;
-      layer.sprite.scale.setScalar(layer.baseScale * breathe);
+      // Slow breath on scale and opacity — readable as living, not a flicker.
+      const breathe = 1 + Math.sin(this.time * (0.38 + i * 0.11) + i * 2.1) * 0.075;
+      const pulse = 1 + Math.sin(this.time * 0.31 + i) * 0.08;
+      layer.material.opacity = layer.baseOpacity * this.strength * pulse;
+      layer.sprite.scale.setScalar(layer.baseScale * this.worldScale * breathe);
       layer.sprite.material.rotation = this.time * layer.spin;
     }
   }

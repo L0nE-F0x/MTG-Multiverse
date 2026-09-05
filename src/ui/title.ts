@@ -3,6 +3,7 @@
  * The galaxy keeps turning behind it. Tour and Settings are the secondary
  * actions; the Wizards disclaimer and ApexForge credit sit at the bottom.
  */
+import { isEmbedded } from '../core/embed.ts';
 import { store } from '../core/store.ts';
 import type { Universe } from '../data/universe.ts';
 import {
@@ -187,7 +188,7 @@ export function mountTitle(root: HTMLElement, universe: Universe, host: TitleHos
   });
   const offBip = listen(window, 'beforeinstallprompt', (e) => {
     e.preventDefault();
-    if (isStandalone()) return;
+    if (isStandalone() || isEmbedded()) return;
     deferredInstall = e as BeforeInstallPromptEvent;
     installBtn.hidden = false;
   });
@@ -195,7 +196,7 @@ export function mountTitle(root: HTMLElement, universe: Universe, host: TitleHos
     deferredInstall = null;
     installBtn.hidden = true;
   });
-  if (isStandalone()) installBtn.hidden = true;
+  if (isStandalone() || isEmbedded()) installBtn.hidden = true;
 
   const offKeydown = listen(window, 'keydown', (e) => {
     const ev = e as KeyboardEvent;

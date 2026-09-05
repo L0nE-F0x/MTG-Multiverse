@@ -148,16 +148,19 @@ export function createPostChain(
 
   const bloom = new BloomEffect({
     blendFunction: BlendFunction.ADD,
-    intensity: 1.15,
-    luminanceThreshold: 0.12,
-    luminanceSmoothing: 0.34,
+    intensity: 1.05,
+    // 0.12 bloomed the nebula itself, so the inner arms clipped to a white
+    // sheet the moment they overlapped a bright star. Stars still bloom;
+    // the gas keeps its colour.
+    luminanceThreshold: 0.42,
+    luminanceSmoothing: 0.22,
     mipmapBlur: true,
-    radius: 0.86,
-    kernelSize: KernelSize.HUGE,
+    radius: 0.74,
+    kernelSize: KernelSize.LARGE,
   });
 
   const chromatic = new ChromaticAberrationEffect({
-    offset: new THREE.Vector2(0.00055, 0.00055),
+    offset: new THREE.Vector2(0.00032, 0.00032),
     radialModulation: true,
     modulationOffset: 0.42,
   });
@@ -165,13 +168,13 @@ export function createPostChain(
   const vignette = new VignetteEffect({ offset: 0.26, darkness: 0.66 });
 
   const grain = new NoiseEffect({ blendFunction: BlendFunction.OVERLAY, premultiply: true });
-  grain.blendMode.opacity.value = 0.042;
+  grain.blendMode.opacity.value = 0.028;
 
   const toneMapping = new ToneMappingEffect({
     mode: ToneMappingMode.ACES_FILMIC,
     resolution: 256,
-    whitePoint: 4.0,
-    middleGrey: 0.42,
+    whitePoint: 6.5,
+    middleGrey: 0.40,
   });
 
   // One pass: the library merges these into a single fragment shader.
@@ -179,7 +182,7 @@ export function createPostChain(
 
   return {
     composer,
-    setBloom: (v) => { bloom.intensity = v * 1.15; },
+    setBloom: (v) => { bloom.intensity = v * 1.05; },
     setExposure: (v) => { renderer.toneMappingExposure = v; },
     setTrails: (enabled) => { trail.enabled = enabled; },
     setSize: (w, h) => composer.setSize(w, h),

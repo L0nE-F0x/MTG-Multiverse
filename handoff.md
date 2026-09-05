@@ -13,6 +13,24 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 # ▶ START HERE — next session
 
+**2026-09-05 — phase 2: public URL is filthy-net-deck.com/aetherfield.**
+
+The galaxy polish (10× list + pick/perf fix) is in this working tree, not
+yet on Netlify. **Push this repo first** so mtg-multiverse.netlify.app is
+current; FND's marketing site then proxies `/aetherfield/*` at that origin
+(see Filthy-Net-Deck `website/netlify.toml`). The iframe inside the app is
+still a vendored `dist/` — this URL does not update installers.
+
+Service worker: `src/main.ts` registers `/sw.js` only at origin root and
+never when framed. That is load-bearing for the path proxy — a worker on
+filthy-net-deck.com/aetherfield/ would cache the marketing site
+(`Service-Worker-Allowed: /`). Do not loosen the pathname check.
+
+Next after both deploys: phase 3 — drop `?shell=play` in FND so the title,
+tour and settings show in-app (Install is already hidden when `isEmbedded()`).
+Then phase 4 ships with that FND release (Sets/DeckView deep links are
+already coded).
+
 **2026-09-05 — how this repo reaches Filthy Net Deck. Read before assuming.**
 
 Owner is continuing tonight with other models, and asked whether pushing here

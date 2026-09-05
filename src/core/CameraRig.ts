@@ -75,6 +75,12 @@ export class CameraRig {
   private idleSince = performance.now();
   private readonly keys = new Set<string>();
   private disposers: (() => void)[] = [];
+  private cinematic: {
+    t: number;
+    duration: number;
+    from: { theta: number; phi: number; radius: number; target: THREE.Vector3 };
+    to: { theta: number; phi: number; radius: number; target: THREE.Vector3 };
+  } | null = null;
 
   constructor(camera: THREE.PerspectiveCamera, element: HTMLElement) {
     this.camera = camera;
@@ -96,6 +102,7 @@ export class CameraRig {
     };
 
     on('pointerdown', (e) => {
+      if (this.cinematic) this.skipCinematic();
       if (!this.inputEnabled) return;
       el.setPointerCapture(e.pointerId);
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -168,6 +175,10 @@ export class CameraRig {
     const keyDown = (e: KeyboardEvent) => {
       if (!this.inputEnabled || isTyping()) return;
       const k = e.key.toLowerCase();
+      if (this.cinematic && (NAV_KEYS.has(k) || k === 'escape' || k === ' ')) {
+        this.skipCinematic();
+        return;
+      }
       if (!NAV_KEYS.has(k)) return;
       e.preventDefault();
       this.keys.add(k);
@@ -240,9 +251,57 @@ export class CameraRig {
    * slower and more cinematic.
    */
   flyTo(point: THREE.Vector3, distance: number, damping = 2.6): void {
+    this.cinematic = null;
     this.goalTarget.copy(point);
     this.goalRadius = clamp(distance, this.minRadius, this.maxRadius);
     this.damping = damping;
+    this.goalDamping = 6.5;
+    this.poke();
+  }
+
+  get isCinematic(): boolean { return this.cinematic !== null; }
+
+  /**
+   * Scripted core → rim flight. `duration` is seconds. Any later `flyTo`,
+   * pointer, or `skipCinematic` cancels it.
+   */
+  playCinematic(framed: number, framePhi: number, duration = 45): void {
+    this.cinematic = {
+      t: 0,
+      duration,
+      from: {
+        theta: this.theta,
+        phi: 1.22,
+        radius: 48,
+        target: new THREE.Vector3(8, 4, 0),
+      },
+      to: {
+        theta: this.theta + 1.85,
+        phi: framePhi,
+        radius: framed,
+        target: new THREE.Vector3(0, 0, 0),
+      },
+    };
+    this.theta = this.cinematic.from.theta;
+    this.phi = this.cinematic.from.phi;
+    this.radius = this.cinematic.from.radius;
+    this.target.copy(this.cinematic.from.target);
+    this.goalTheta = this.theta;
+    this.goalPhi = this.phi;
+    this.goalRadius = this.radius;
+    this.goalTarget.copy(this.target);
+    this.applyImmediate();
+  }
+
+  skipCinematic(): void {
+    if (!this.cinematic) return;
+    const to = this.cinematic.to;
+    this.cinematic = null;
+    this.goalTheta = to.theta;
+    this.goalPhi = to.phi;
+    this.goalRadius = to.radius;
+    this.goalTarget.copy(to.target);
+    this.damping = 4.2;
     this.goalDamping = 6.5;
     this.poke();
   }
@@ -269,6 +328,26 @@ export class CameraRig {
   }
 
   update(dt: number): void {
+    if (this.cinematic) {
+      this.cinematic.t = Math.min(1, this.cinematic.t + dt / this.cinematic.duration);
+      const u = this.cinematic.t;
+      // Smoothstep: slow at the core, gathers speed, eases into the framed view.
+      const s = u * u * (3 - 2 * u);
+      const a = this.cinematic.from;
+      const b = this.cinematic.to;
+      this.theta = a.theta + (b.theta - a.theta) * s;
+      this.phi = a.phi + (b.phi - a.phi) * s;
+      this.radius = a.radius + (b.radius - a.radius) * s;
+      this.target.lerpVectors(a.target, b.target, s);
+      this.goalTheta = this.theta;
+      this.goalPhi = this.phi;
+      this.goalRadius = this.radius;
+      this.goalTarget.copy(this.target);
+      this.applyImmediate();
+      if (u >= 1) this.cinematic = null;
+      return;
+    }
+
     this.applyKeys(dt);
     if (this.autoRotate && !this.dragging && this.idleSeconds > 2.5) {
       this.goalTheta += this.autoRotateSpeed * dt;
@@ -301,6 +380,28 @@ export class CameraRig {
   }
 
   get distance(): number { return this.radius; }
+  get heading(): number { return this.theta; }
+  get elevation(): number { return this.phi; }
+
+  snapshot(): { theta: number; phi: number; radius: number; target: [number, number, number] } {
+    return {
+      theta: this.theta,
+      phi: this.phi,
+      radius: this.radius,
+      target: [this.target.x, this.target.y, this.target.z],
+    };
+  }
+
+  restore(pose: { theta: number; phi: number; radius: number; target: [number, number, number] }): void {
+    this.cinematic = null;
+    this.goalTheta = pose.theta;
+    this.goalPhi = clamp(pose.phi, MIN_PHI, MAX_PHI);
+    this.goalRadius = clamp(pose.radius, this.minRadius, this.maxRadius);
+    this.goalTarget.set(pose.target[0], pose.target[1], pose.target[2]);
+    this.damping = 3.4;
+    this.goalDamping = 6.5;
+    this.poke();
+  }
 
   dispose(): void {
     for (const d of this.disposers) d();

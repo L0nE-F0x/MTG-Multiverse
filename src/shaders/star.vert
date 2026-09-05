@@ -11,6 +11,11 @@ uniform float uHovered;
 uniform float uSelected;
 uniform float uTwinkle;
 uniform float uExposure;
+uniform float uHoverOracle;
+uniform float uSelectedOracle;
+uniform float uNewestSet;
+uniform float uFormatBit;
+uniform float uHighlightOn;
 
 attribute vec3  aPosB;
 attribute vec3  aColor;
@@ -20,6 +25,10 @@ attribute float aSeed;
 attribute float aVisPrev;
 attribute float aVisNext;
 attribute float aIndex;
+attribute float aOracle;
+attribute float aSetIdx;
+attribute float aFormatMask;
+attribute float aHighlight;
 
 varying vec3  vColor;
 varying float vBright;
@@ -43,6 +52,13 @@ void main() {
   float dist = max(-mv.z, 0.001);
   float vis = mix(aVisPrev, aVisNext, uFilterMorph);
 
+  // Arena format focus: illegal cards keep their position but dim like a filter.
+  if (uFormatBit > 0.5) {
+    float legal = step(0.5, mod(floor(aFormatMask / uFormatBit), 2.0));
+    vis *= mix(0.12, 1.0, legal);
+  }
+  if (uHighlightOn > 0.5) vis *= mix(0.08, 1.0, aHighlight);
+
   float bright = aBright * mix(uDim, 1.0, vis);
   // Filtered-out stars shrink hard as well as dimming. Brightness alone is not
   // enough: the excluded set usually outnumbers the matching one ten to one, so
@@ -52,7 +68,7 @@ void main() {
 
   // Twinkle is per-star and slow; without the seed offset the whole field
   // pulses in unison and reads as a flicker bug.
-  bright *= 1.0 + uTwinkle * 0.28 * sin(uTime * 1.7 + aSeed * 240.0);
+  bright *= 1.0 + uTwinkle * 0.16 * sin(uTime * 1.35 + aSeed * 240.0);
 
   float wanted = size * uSizeScale / dist;
   float clamped = max(wanted, uMinPixels);
@@ -64,9 +80,16 @@ void main() {
 
   float hovered  = step(abs(aIndex - uHovered), 0.5);
   float selected = step(abs(aIndex - uSelected), 0.5);
-  vHighlight = max(hovered * 0.6, selected);
+  float kinHover = step(abs(aOracle - uHoverOracle), 0.5) * step(0.0, uHoverOracle);
+  float kinSel   = step(abs(aOracle - uSelectedOracle), 0.5) * step(0.0, uSelectedOracle);
+  vHighlight = max(max(hovered * 0.6, selected), max(kinHover * 0.45, kinSel * 0.7));
   clamped *= 1.0 + vHighlight * 2.2;
   bright *= 1.0 + vHighlight * 2.0;
+
+  // Newest set is a bright knot on the rim — the whole printing, not one star.
+  float fresh = step(abs(aSetIdx - uNewestSet), 0.5) * step(0.0, uNewestSet);
+  clamped *= 1.0 + fresh * 0.55;
+  bright *= 1.0 + fresh * 0.45;
 
   gl_PointSize = min(clamped, 220.0);
 
