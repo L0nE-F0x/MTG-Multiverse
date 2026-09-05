@@ -2,6 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <!-- Netlify cannot 301 /aetherfield → /aetherfield/ (slash-normalised to
+         a self-redirect). Relative `./assets` from `base: './'` only resolve
+         under this prefix when the path ends in /. -->
+    <script>
+      (function () {
+        if (location.pathname === "/aetherfield") {
+          location.replace("/aetherfield/" + location.search + location.hash);
+        }
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <title>Aetherfield — every Magic card ever printed, as a galaxy</title>
     <meta name="description" content="Aetherfield: all 117,621 Magic: The Gathering cards ever printed, rendered as one explorable 3D galaxy. Spiral arms are colour identity, distance from the core is release date, and the brightest stars are the cards you know." />

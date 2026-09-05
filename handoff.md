@@ -15,11 +15,11 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 **2026-09-05 — phase 2: public URL is filthy-net-deck.com/aetherfield.**
 
-The galaxy polish (10× list + pick/perf fix) is in this working tree, not
-yet on Netlify. **Push this repo first** so mtg-multiverse.netlify.app is
-current; FND's marketing site then proxies `/aetherfield/*` at that origin
-(see Filthy-Net-Deck `website/netlify.toml`). The iframe inside the app is
-still a vendored `dist/` — this URL does not update installers.
+Polish is on `main` (`bdd5fd8`). FND's marketing site 200-proxies
+`/aetherfield` and `/aetherfield/*` at this origin — **no slash-adding 301**
+(that looped). `index.html` client-replaces the exact path `/aetherfield` so
+relative assets still resolve. The iframe inside the app is still a vendored
+`dist/` — this URL does not update installers.
 
 Service worker: `src/main.ts` registers `/sw.js` only at origin root and
 never when framed. That is load-bearing for the path proxy — a worker on
