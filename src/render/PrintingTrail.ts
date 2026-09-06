@@ -43,6 +43,8 @@ export class PrintingTrail {
 
   /** Card indices currently threaded, oldest first. */
   private points: number[] = [];
+  /** Selected card, or -1. Kept so a layout switch cannot revive a dismissed thread. */
+  private card = -1;
   private opacity = 0;
   private targetOpacity = 0;
   private layoutSupported = true;
@@ -88,16 +90,25 @@ export class PrintingTrail {
    */
   setLayoutSupported(supported: boolean): void {
     this.layoutSupported = supported;
-    if (!supported) this.targetOpacity = 0;
-    else if (this.points.length >= 2) this.targetOpacity = 1;
+    if (!supported) {
+      // Instant: a fade during the morph would scribble across set clusters.
+      this.targetOpacity = 0;
+      this.opacity = 0;
+      this.line.visible = false;
+      return;
+    }
+    if (this.card >= 0 && this.points.length >= 2) this.targetOpacity = 1;
   }
 
   /** Pass -1 to clear. */
   setCard(card: number): void {
     if (card < 0) {
+      this.card = -1;
+      this.points = [];
       this.targetOpacity = 0;
       return;
     }
+    this.card = card;
 
     const printings = this.universe.printingsOf(card);
     if (printings.length < 2) {
@@ -125,7 +136,10 @@ export class PrintingTrail {
   }
 
   update(dt: number): void {
-    const k = 1 - Math.exp(-dt / (FADE_SECONDS / 4));
+    // Drop faster than it appears, so dismissing a card does not leave a ghost
+    // hanging over the next layout.
+    const tau = this.targetOpacity < this.opacity ? FADE_SECONDS * 0.4 : FADE_SECONDS;
+    const k = 1 - Math.exp(-dt / (tau / 4));
     this.opacity += (this.targetOpacity - this.opacity) * k;
     this.material.opacity = this.opacity * 0.92;
 

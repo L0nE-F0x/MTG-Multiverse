@@ -70,6 +70,7 @@ export class App {
   private pointerDown = { x: 0, y: 0, t: 0 };
   private pointerInside = false;
   private lastPointer = { x: 0, y: 0 };
+  private lastHeading = Number.NaN;
   /** Camera pose at the last pick, so motion can re-arm one. */
   /**
    * Quantised camera pose at the last camera-driven pick: distance, target,
@@ -146,7 +147,7 @@ export class App {
     // Booting at max raymarch cost made the first few seconds of flight the
     // heaviest, which is exactly when a host webview looks like it "can't run
     // this". Embedded views (Tauri) start one step lower still.
-    this.tier = isEmbedded() ? 1 : 2;
+    this.tier = isEmbedded() ? 2 : 3;
     this.resize();
     this.applyQuality();
 
@@ -228,8 +229,30 @@ export class App {
       // the end of an orbit drag and selecting would be infuriating.
       const moved = Math.hypot(e.clientX - this.pointerDown.x, e.clientY - this.pointerDown.y);
       if (moved > CLICK_SLOP_PX || performance.now() - this.pointerDown.t > 700) return;
-      const hovered = store.state.hovered;
-      store.set('selected', hovered);
+      const rect = this.canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const { cssW, cssH } = this.viewport();
+      const billboard = this.billboards.hitTest(this.camera, x, y, cssW, cssH);
+      if (billboard >= 0) {
+        store.set('selected', billboard);
+        return;
+      }
+      // Fresh pick, not the last hover: a click in the blackness has to miss
+      // even if a fat pick sprite from a nearby star overlapped the cursor.
+      this.picker.request(x, y);
+      this.picker.poll(this.renderer, this.camera, (index) => {
+        let hit = index >= 0 && index < this.universe.count ? index : -1;
+        if (hit >= 0) {
+          this.starfield.positionOf(hit, this.tmpVec).project(this.camera);
+          const sx = ((this.tmpVec.x + 1) / 2) * rect.width;
+          const sy = ((1 - this.tmpVec.y) / 2) * rect.height;
+          if (Math.hypot(sx - x, sy - y) > 36) hit = -1;
+        }
+        store.set('hovered', hit);
+        this.starfield.material.uniforms.uHovered.value = hit;
+        store.set('selected', hit);
+      });
     });
 
     add<KeyboardEvent>(window, 'keydown', (e) => {
@@ -456,8 +479,6 @@ export class App {
     } else if (cue.kind === 'cinematic') {
       this.rig.playCinematic(this.framedDistance(), this.starfield.framePhi(), 45);
       store.set('cinematic', true);
-    } else if (cue.kind === 'bookmark') {
-      this.rig.restore(cue);
     } else if (cue.kind === 'arm') {
       const world = COLOR_ANGLE[COLOR_BIT[cue.color]] ?? 0;
       this.rig.setAngles(Math.PI / 2 - world, this.starfield.framePhi());
@@ -505,7 +526,7 @@ export class App {
     const { cssW, cssH, insetLeft } = this.viewport();
     // Host webviews (Tauri) often sit on a retina panel and an iGPU at once.
     // Capping DPR there cuts fill-rate without touching the public site.
-    const dprCap = isEmbedded() ? 1.25 : 1.5;
+    const dprCap = isEmbedded() ? 1.25 : 2;
     const dpr = Math.min(window.devicePixelRatio || 1, dprCap) * this.renderScale;
 
     this.renderer.setPixelRatio(dpr);
@@ -549,6 +570,11 @@ export class App {
     const time = this.clock.elapsedTime;
 
     this.rig.update(dt);
+    const heading = this.rig.heading;
+    if (!Number.isFinite(this.lastHeading) || Math.abs(heading - this.lastHeading) > 0.025) {
+      this.lastHeading = heading;
+      store.set('viewHeading', heading);
+    }
     this.starfield.update(dt, time);
     this.worldScale += (this.targetWorldScale - this.worldScale) * (1 - Math.exp(-dt * 2.2));
     this.nebula.setWorldScale(this.worldScale);

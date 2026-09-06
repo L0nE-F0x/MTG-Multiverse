@@ -148,15 +148,14 @@ export function createPostChain(
 
   const bloom = new BloomEffect({
     blendFunction: BlendFunction.ADD,
-    intensity: 1.05,
-    // 0.12 bloomed the nebula itself, so the inner arms clipped to a white
-    // sheet the moment they overlapped a bright star. Stars still bloom;
-    // the gas keeps its colour.
-    luminanceThreshold: 0.42,
-    luminanceSmoothing: 0.22,
+    intensity: 1.12,
+    // 0.12 bloomed the nebula into a white sheet; 0.42 left the stars looking
+    // dry. This is the gap where cores glow and the gas keeps its colour.
+    luminanceThreshold: 0.32,
+    luminanceSmoothing: 0.24,
     mipmapBlur: true,
-    radius: 0.74,
-    kernelSize: KernelSize.LARGE,
+    radius: 0.80,
+    kernelSize: KernelSize.HUGE,
   });
 
   const chromatic = new ChromaticAberrationEffect({
@@ -173,8 +172,8 @@ export function createPostChain(
   const toneMapping = new ToneMappingEffect({
     mode: ToneMappingMode.ACES_FILMIC,
     resolution: 256,
-    whitePoint: 6.5,
-    middleGrey: 0.40,
+    whitePoint: 5.2,
+    middleGrey: 0.42,
   });
 
   // One pass: the library merges these into a single fragment shader.
@@ -182,7 +181,7 @@ export function createPostChain(
 
   return {
     composer,
-    setBloom: (v) => { bloom.intensity = v * 1.05; },
+    setBloom: (v) => { bloom.intensity = v * 1.12; },
     setExposure: (v) => { renderer.toneMappingExposure = v; },
     setTrails: (enabled) => { trail.enabled = enabled; },
     setSize: (w, h) => composer.setSize(w, h),

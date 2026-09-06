@@ -178,8 +178,9 @@
 
 .mcu-float-tip {
   position: fixed;
-  z-index: 80;
-  max-width: 240px;
+  z-index: 98;
+  min-width: 196px;
+  max-width: 280px;
   padding: 8px 10px;
   font-size: 11px;
   line-height: 1.45;

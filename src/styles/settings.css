@@ -91,6 +91,31 @@
   cursor: pointer;
 }
 
+.mcu-settings-reset {
+  display: block;
+  width: 100%;
+  margin: 10px 0 4px;
+  padding: 7px 10px;
+  pointer-events: auto;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--mcu-border);
+  color: var(--mcu-text-dim);
+  border-radius: 6px;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  transition: all 180ms var(--mcu-ease);
+}
+.mcu-settings-reset:hover {
+  color: var(--mcu-cyan);
+  border-color: var(--mcu-border-strong);
+}
+.mcu-settings-label[data-tip],
+.mcu-settings-checkbox-row[data-tip],
+.mcu-settings-reset[data-tip] {
+  cursor: help;
+}
+
 .mcu-telemetry {
   display: flex;
   justify-content: space-between;

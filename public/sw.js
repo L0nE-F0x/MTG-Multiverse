@@ -1,7 +1,7 @@
 /* App-shell service worker. Hashed Vite assets are immutable; /data/ is
    network-first so a new catalogue is picked up without a hard refresh. */
 
-const VERSION = 'aetherfield-pwa-2';
+const VERSION = 'aetherfield-pwa-3';
 const SHELL = [
   '/',
   '/index.html',

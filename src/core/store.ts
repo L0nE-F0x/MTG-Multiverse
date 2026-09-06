@@ -46,8 +46,7 @@ export interface FilterState {
 export type CameraCue =
   | { kind: 'arm'; color: ColorLetter }
   | { kind: 'cinematic' }
-  | { kind: 'skip-cinematic' }
-  | { kind: 'bookmark'; theta: number; phi: number; radius: number; target: [number, number, number] };
+  | { kind: 'skip-cinematic' };
 
 export interface VisualState {
   bloom: number;
@@ -112,6 +111,8 @@ export interface AppState {
   cinematic: boolean;
   /** Oracle ids to lift (collection / deck). Empty = no highlight pass. */
   highlightOracles: Set<number>;
+  /** Camera azimuth, radians. The colour-pie compass uses this as a heading. */
+  viewHeading: number;
 }
 
 export function defaultFilter(): FilterState {
@@ -175,6 +176,7 @@ class Store {
     cameraCue: null,
     cinematic: false,
     highlightOracles: new Set(),
+    viewHeading: 0,
   };
 
   private listeners = new Map<StateKey, Set<Listener<never>>>();

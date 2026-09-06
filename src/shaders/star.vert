@@ -72,7 +72,7 @@ void main() {
 
   // Twinkle is per-star and slow; without the seed offset the whole field
   // pulses in unison and reads as a flicker bug.
-  bright *= 1.0 + uTwinkle * 0.16 * sin(uTime * 1.35 + aSeed * 240.0);
+  bright *= 1.0 + uTwinkle * 0.22 * sin(uTime * 1.5 + aSeed * 240.0);
 
   float wanted = size * uSizeScale / dist;
   float clamped = max(wanted, uMinPixels);

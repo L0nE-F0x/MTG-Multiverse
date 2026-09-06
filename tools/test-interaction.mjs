@@ -500,63 +500,43 @@ try {
     `uDensity=${woken.density.toFixed(3)}`);
   await page.evaluate(() => window.__mcu.store.patchVisual({ showNebula: true, autoRotate: true }));
 
-  // --- bookmarks -------------------------------------------------------------
-  // Naming a view used to go through window.prompt, which resolves to null
-  // under WKWebView — so on macOS the button silently did nothing.
-  const bookmark = await page.evaluate(async () => {
-    localStorage.removeItem('aetherfield.bookmarks.v1');
-    const wrap = document.querySelector('.mcu-bookmarks-wrap');
-    const toggle = wrap?.querySelector('.mcu-bookmarks-toggle');
-    if (!(toggle instanceof HTMLButtonElement)) return { error: 'no toggle' };
-    toggle.click();
-    const save = wrap.querySelector('.mcu-bookmarks-save');
-    if (!(save instanceof HTMLButtonElement)) return { error: 'no save button' };
-    save.click();
-    const input = wrap.querySelector('.mcu-bookmarks-name');
-    if (!(input instanceof HTMLInputElement)) return { error: 'no inline name field' };
-    input.value = 'Test view';
-    const confirm = wrap.querySelector('.mcu-bookmarks-confirm');
-    if (!(confirm instanceof HTMLButtonElement)) return { error: 'no confirm button' };
-    confirm.click();
-    await new Promise((r) => setTimeout(r, 100));
-    const stored = JSON.parse(localStorage.getItem('aetherfield.bookmarks.v1') ?? '[]');
-    return { names: [...wrap.querySelectorAll('.mcu-bookmarks-go')].map((b) => b.textContent), stored };
-  });
-  check('saving a view needs no window.prompt', !bookmark.error, bookmark.error ?? '');
-  check('the saved view is listed and persisted',
-    bookmark.names?.includes('Test view') && bookmark.stored?.length === 1,
-    `listed ${JSON.stringify(bookmark.names ?? [])}`);
-
-  // A hand-edited store entry must not reach the renderer as a live layout
-  // name or a NaN camera pose. Storage is shared with whatever else lives on
-  // this origin — inside a host app, that is the host.
-  await page.evaluate(() => {
-    localStorage.setItem('aetherfield.bookmarks.v1', JSON.stringify([
-      { id: 'x', name: 'Bad', layout: 'not-a-layout', camera: null, filter: 'nope' },
-    ]));
-  });
+  // --- printing thread -------------------------------------------------------
+  // Selecting a reprinted card draws a line through its printings. Dismissing
+  // it used to leave the points in place, so a later layout switch revived
+  // the thread with nobody selected.
   await page.goto(`${URL}?shell=play`, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.waitForFunction('window.__mcu !== undefined', { timeout: 120000, polling: 250 });
   await sleep(1200);
-  const hostile = await page.evaluate(async () => {
-    const wrap = document.querySelector('.mcu-bookmarks-wrap');
-    wrap?.querySelector('.mcu-bookmarks-toggle')?.click();
-    const go = wrap?.querySelector('.mcu-bookmarks-go');
-    if (!(go instanceof HTMLButtonElement)) return { error: 'corrupt bookmark was not listed' };
-    go.click();
-    await new Promise((r) => setTimeout(r, 600));
-    const app = window.__mcu.app;
-    return {
-      layout: window.__mcu.store.state.layout,
-      distance: app.rig.distance,
-      x: app.camera.position.x,
-    };
+  await page.evaluate(() => {
+    const i = window.__mcu.universe.search('Sol Ring', 1)[0];
+    window.__mcu.store.set('selected', i);
   });
-  check('a corrupt bookmark cannot push the renderer somewhere it cannot draw',
-    !hostile.error && hostile.layout === 'galaxy' &&
-    Number.isFinite(hostile.distance) && Number.isFinite(hostile.x),
-    hostile.error ?? `layout="${hostile.layout}" distance=${hostile.distance}`);
-  await page.evaluate(() => localStorage.removeItem('aetherfield.bookmarks.v1'));
+  await sleep(700);
+  const trailOn = await page.evaluate(() => window.__mcu.app.printingTrail.line.visible);
+  check('selecting a reprinted card draws its printing thread', trailOn === true);
+
+  await page.evaluate(() => window.__mcu.store.set('selected', -1));
+  await sleep(700);
+  const trailOff = await page.evaluate(() => window.__mcu.app.printingTrail.line.visible);
+  check('deselecting hides the printing thread', trailOff === false);
+
+  await page.evaluate(() => {
+    const i = window.__mcu.universe.search('Sol Ring', 1)[0];
+    window.__mcu.store.set('selected', i);
+  });
+  await sleep(400);
+  await page.evaluate(() => window.__mcu.store.set('layout', 'sets'));
+  await sleep(200);
+  const trailSets = await page.evaluate(() => window.__mcu.app.printingTrail.line.visible);
+  check('the printing thread hides in the sets layout', trailSets === false);
+
+  await page.evaluate(() => {
+    window.__mcu.store.set('selected', -1);
+    window.__mcu.store.set('layout', 'galaxy');
+  });
+  await sleep(500);
+  const trailStay = await page.evaluate(() => window.__mcu.app.printingTrail.line.visible);
+  check('a dismissed thread does not return on a layout switch', trailStay === false);
 
   // --- the embed message channel ---------------------------------------------
   // The host drives highlighting over postMessage. Nothing else in the suite

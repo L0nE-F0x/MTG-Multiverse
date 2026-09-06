@@ -59,13 +59,10 @@ async function main(): Promise<void> {
 
   // The UI layer is optional at runtime: if it fails to load, the galaxy still
   // flies. Keeps the renderer independently testable.
-  const camHost = {
-    cameraSnapshot: () => ({ theta: 0, phi: 1.07, radius: 900, target: [0, 0, 0] as [number, number, number] }),
-  };
   let ui: UIHandles | null = null;
   try {
     const mod = await import('./ui/index.ts');
-    ui = mod.mountUI(uiRoot, universe, camHost);
+    ui = mod.mountUI(uiRoot, universe);
   } catch (err) {
     console.warn('[mcu] UI layer unavailable, running renderer only:', err);
   }
@@ -79,7 +76,6 @@ async function main(): Promise<void> {
   const app = new App(canvas, universe, {
     onHoverAnchor: (p) => ui?.setHoverAnchor(p),
   });
-  camHost.cameraSnapshot = () => app.rig.snapshot();
   app.start();
 
   onHostMessage((msg) => {

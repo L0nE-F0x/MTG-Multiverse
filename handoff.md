@@ -13,6 +13,20 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 # ▶ START HERE — next session
 
+**2026-09-06 — printing thread, Saved Views, settings tips, minimap, look.**
+
+- The reprint thread no longer comes back after you dismiss a card and switch
+  layout. Deselect clears the points; unsupported layouts hide instantly.
+  Clicking the blackness around a star now misses fat pick sprites and
+  actually deselects.
+- Saved Views is gone. It was a prompt-shaped panel nobody used.
+- Settings sliders explain themselves on hover (bloom, exposure, nebula…).
+  Reset look puts the defaults back.
+- Colour-pie compass is a glass chip with WUBRG letters and a heading tick.
+- Look pass: framed nebula no longer marches at 55% steps, public DPR cap
+  is 2, bloom sits between “white sheet” and “dry stars”, twinkle is a bit
+  more alive. Boot quality starts one rung higher.
+
 **2026-09-06 — the audit's highlight-only deck was the regression. Isolated again.**
 
 v3.7.1 shipped the audit as a "fix" and the galaxy **looked and worked worse**.

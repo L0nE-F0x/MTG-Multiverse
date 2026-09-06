@@ -461,7 +461,7 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
     const next = { ...defaultInsets(), left: Math.round(onScreen) };
 
     // The CSS variable says the same thing, but in the other coordinate space.
-    // Anything that consumes it — `.mcu-layout-switcher`, `.mcu-bookmarks-wrap`
+    // Anything that consumes it — `.mcu-layout-switcher`
     // — lives inside the element `scale.ts` puts `zoom` on, so a length written
     // there is multiplied by the scale before it reaches the screen. Writing
     // the screen-pixel figure applied that scale twice and left the chrome

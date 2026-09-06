@@ -274,7 +274,9 @@ export class Nebula {
     const pose = `${camera.position.x.toFixed(1)}|${camera.position.y.toFixed(1)}|${camera.position.z.toFixed(1)}`;
     this.skipRender = !this.dirty && !moving && pose === this.lastPose;
     this.lastPose = pose;
-    const far = distance > bound * 1.85;
+    // Framed distance is ~2.25× the bound, so 1.85 treated the default view as
+    // "far" and marched at 55% steps — the hero shot was the softest one.
+    const far = distance > bound * 2.6;
     const steps = far ? Math.max(16, Math.round(this.baseSteps * 0.55)) : this.baseSteps;
     this.marchMaterial.uniforms.uSteps.value = steps;
   }
