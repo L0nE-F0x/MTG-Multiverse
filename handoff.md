@@ -13,6 +13,28 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 # ▶ START HERE — next session
 
+**2026-09-06 — the audit's highlight-only deck was the regression. Isolated again.**
+
+v3.7.1 shipped the audit as a "fix" and the galaxy **looked and worked worse**.
+The URL/comma round-trip and nebula-invalidate were real. The product change
+bundled with them was not: `?cards=` stopped isolating the deck and only dimmed
+everyone else to 8% vis. Additive blending of 117k still-on points *is* the
+galaxy, so "Show this deck" read as a slightly dirtier sky. FND then posted
+the tracker's whole collection over that highlight, so even the dimming was
+the wrong cards.
+
+Restored:
+
+- **`?cards=` filters + highlights** (v3.7.0 isolation, v3.7.1 encoding). HUD
+  says `N-card deck`. Filter panel has Show in context / Clear.
+- Host `highlight` stays overlay-only and is **not** written into `?cards=`.
+- DFC front faces resolve (`Bonecrusher Giant` → `Bonecrusher Giant // Stomp`)
+  without also pulling art-card doubles (`Sol Ring // Sol Ring`).
+- Era labels fanned off one spoke so Alpha/Revised no longer stack.
+- Interaction suite **56/56**.
+
+FND side (collection skip, sidebar no-op, Sets `useLocale`) ships in **v3.7.2**.
+
 **2026-09-06 — the v3.7.0 audit is cleared, and FND v3.7.1 ships it.**
 
 Every finding in `AUDIT-2026-09-05.md` is fixed, across both repos, committed
@@ -23,10 +45,9 @@ macOS dmg, Linux pacman package — so the fixes below are in the vendored
 Three that were hurting live users:
 
 - **`?cards=` survives now.** The writer never re-emitted it, so the deck died
-  on the first click. It also **highlights instead of filtering** — the owner
-  chose that: a 100-card list filtered down is a few thousand points on an
-  empty field, and the host's `highlight` message already worked that way, so
-  the two entry points agree at last.
+  on the first click. v3.7.1 also **highlighted instead of filtering** — that
+  was the visual regression; isolation is restored above. The host's
+  `highlight` message is a separate collection overlay.
 - **The nebula controls work with auto-rotate off.** The march is cached
   between frames, and no uniform change invalidated it, so one persisted
   checkbox killed the nebula toggle, the intensity slider and the

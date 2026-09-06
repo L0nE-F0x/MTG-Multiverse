@@ -32,6 +32,7 @@ const LAYOUTS: { mode: LayoutMode; label: string; desc: string }[] = [
 export function mountHud(root: HTMLElement, universe: Universe, hooks: HudHooks): HudHandle {
   // ---- Command bar --------------------------------------------------
   const countN = el('span', { className: 'mcu-command-count-n' });
+  const countExtra = el('span', { className: 'mcu-command-count-extra' });
   const aboutBtn = el('button', {
     className: 'mcu-about-btn',
     text: '?',
@@ -57,6 +58,7 @@ export function mountHud(root: HTMLElement, universe: Universe, hooks: HudHooks)
         document.createTextNode(' of '),
         el('span', { className: 'mcu-command-count-total', text: fmtInt(universe.count) }),
         document.createTextNode(' stars visible'),
+        countExtra,
       ],
     ),
   ]);
@@ -64,9 +66,16 @@ export function mountHud(root: HTMLElement, universe: Universe, hooks: HudHooks)
 
   function paintCount(): void {
     countN.textContent = fmtInt(store.state.matchCount);
+    const deck = store.state.filter.oracles.size;
+    const lit = store.state.highlightOracles.size;
+    if (deck > 0) countExtra.textContent = ` · ${fmtInt(deck)}-card deck`;
+    else if (lit > 0) countExtra.textContent = ` · ${fmtInt(lit)} highlighted`;
+    else countExtra.textContent = '';
   }
   paintCount();
   const offMatch = store.on('matchCount', paintCount);
+  const offHighlight = store.on('highlightOracles', paintCount);
+  const offFilterCount = store.on('filter', paintCount);
 
   // ---- Layout switcher ------------------------------------------------
   const descEl = el('div', { className: 'mcu-layout-desc' });
@@ -136,6 +145,8 @@ export function mountHud(root: HTMLElement, universe: Universe, hooks: HudHooks)
   return {
     destroy() {
       offMatch();
+      offHighlight();
+      offFilterCount();
       offLayout();
       offFormat();
       commandBar.remove();

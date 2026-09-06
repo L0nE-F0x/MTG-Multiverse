@@ -89,6 +89,40 @@
   flex-direction: column;
   gap: 18px;
 }
+.mcu-deck-link {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--mcu-cyan) 35%, var(--mcu-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--mcu-cyan) 8%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mcu-deck-link[hidden] { display: none; }
+.mcu-deck-link-copy {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--mcu-text);
+}
+.mcu-deck-link-n { color: var(--mcu-cyan); font-weight: 600; }
+.mcu-deck-link-actions { display: flex; gap: 6px; }
+.mcu-deck-link-btn {
+  pointer-events: auto;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--mcu-border);
+  color: var(--mcu-text-dim);
+  border-radius: 6px;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  padding: 4px 8px;
+  transition: all 180ms var(--mcu-ease);
+}
+.mcu-deck-link-btn:hover {
+  color: var(--mcu-cyan);
+  border-color: var(--mcu-border-strong);
+}
 .mcu-filter-section {
   display: flex;
   flex-direction: column;

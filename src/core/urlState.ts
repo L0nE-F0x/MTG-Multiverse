@@ -2,10 +2,10 @@
  * Two-way sync between the URL and the store, so any view can be linked to.
  *
  * `?card=<scryfall-uuid>` opens that card, `?layout=<mode>` picks the
- * arrangement, `?set=<code>` filters to one set, `?cards=` lights up a deck,
- * and `?shell=play` skips the title screen. Writes use replaceState so that
- * flying around the galaxy does not fill the browser's history with hundreds
- * of entries.
+ * arrangement, `?set=<code>` filters to one set, `?cards=` isolates a deck
+ * (and lights it), and `?shell=play` skips the title screen. Writes use
+ * replaceState so that flying around the galaxy does not fill the browser's
+ * history with hundreds of entries.
  *
  * Everything the reader understands, the writer emits again. That is not
  * tidiness: a parameter the writer forgets is a parameter that survives only
@@ -131,17 +131,19 @@ export function connectUrlState(universe: Universe): () => void {
     } else console.warn(`[mcu] no set matches ?set=${setCode}`);
   }
 
-  // A deck lights up where it sits; it does not filter the galaxy down to
-  // itself. A hundred-card list reduced to its own printings is a few thousand
-  // scattered points on an empty field — the one thing worth seeing, which is
-  // where those cards live relative to everything else, is exactly what
-  // filtering throws away. This is also what the host's `highlight` message
-  // does, so both ways in agree.
+  // A deck link isolates those cards *and* lights them. Highlight-in-place
+  // alone is unreadable: additive blending of 117k dimmed points still paints
+  // a full galaxy, so a hundred-card list vanishes into the haze. Filtering
+  // is what made "Show this deck in the galaxy" work before the audit; the
+  // host's `highlight` message stays a separate overlay (collection, not a
+  // deck) and never writes `filter.oracles`.
   const cardsRaw = rawParam(window.location.search, 'cards');
   if (cardsRaw) {
     const oracles = parseCards(universe, cardsRaw);
-    if (oracles.size > 0) store.set('highlightOracles', oracles);
-    else console.warn('[mcu] no cards matched ?cards=');
+    if (oracles.size > 0) {
+      store.patchFilter({ oracles: new Set(oracles) });
+      store.set('highlightOracles', new Set(oracles));
+    } else console.warn('[mcu] no cards matched ?cards=');
   }
 
   let queued = 0;
@@ -168,7 +170,10 @@ export function connectUrlState(universe: Universe): () => void {
       const mode = store.state.layout;
       if (mode !== 'galaxy' || setCode) next.set('layout', mode);
 
-      const cards = formatCards(universe, store.state.highlightOracles);
+      // Only the isolation filter is URL-backed. A host collection overlay
+      // lives in `highlightOracles` alone and must not rewrite `?cards=` into
+      // every card this machine has ever played.
+      const cards = formatCards(universe, store.state.filter.oracles);
       const qs = cards ? appendRaw(next.toString(), 'cards', cards) : next.toString();
       const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
       window.history.replaceState(null, '', url);
@@ -178,7 +183,6 @@ export function connectUrlState(universe: Universe): () => void {
   const offSelected = store.on('selected', write);
   const offLayout = store.on('layout', write);
   const offFilter = store.on('filter', write);
-  const offHighlight = store.on('highlightOracles', write);
   // Only meaningful while the shell is pinned, but subscribing unconditionally
   // is cheaper than branching and the writer already ignores it otherwise.
   const offShell = store.on('shell', write);
@@ -187,7 +191,6 @@ export function connectUrlState(universe: Universe): () => void {
     offSelected();
     offLayout();
     offFilter();
-    offHighlight();
     offShell();
     if (queued) clearTimeout(queued);
   };

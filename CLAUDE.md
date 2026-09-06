@@ -112,10 +112,11 @@ looks like a pointless detail until it is missing:
   value (not `URLSearchParams.get`, which decodes too early) and decodes each
   token on its own. A token that fails to resolve is re-split on its commas,
   which is what keeps links from before this convention working.
-- **`?cards=` highlights, it does not filter.** A hundred-card list reduced to
-  its own printings is a few thousand scattered points on an empty field; where
-  those cards sit relative to everything else is the only thing worth showing.
-  The host's `highlight` message does the same, so both ways in agree.
+- **`?cards=` isolates the deck (filter + highlight).** Additive blending of
+  117k dimmed points still paints a full galaxy, so highlight-in-place made a
+  hundred-card list vanish. The host's `highlight` message is a separate
+  overlay — collection, not a deck — and must not overwrite `?cards=`. The
+  filter panel's "Show in context" lifts isolation while keeping the cards lit.
 - **`?shell=play` skips the title screen.** A host has already asked "do you
   want this?" with the button that opened us. `connectUrlState` only echoes the
   parameter back when it was supplied, so the public site keeps a clean URL.

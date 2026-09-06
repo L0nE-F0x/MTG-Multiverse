@@ -394,7 +394,12 @@ export class App {
     const fraction = this.universe.count > 0
       ? store.state.matchCount / this.universe.count
       : 1;
-    const populated = 0.12 + 0.88 * fraction;
+    let populated = 0.12 + 0.88 * fraction;
+    // Host collection overlay: matchCount stays at the full catalogue, so the
+    // fraction above does nothing. Pull the gas back so the lit cards can win.
+    if (store.state.highlightOracles.size > 0 && store.state.filter.oracles.size === 0) {
+      populated *= 0.4;
+    }
 
     this.nebula.setDensity(layout * populated);
     this.coreGlow.setStrength(core * populated);
@@ -429,14 +434,18 @@ export class App {
     const wanted = store.state.highlightOracles;
     if (wanted.size === 0) {
       this.starfield.setHighlight(null);
-      return;
+    } else {
+      const mask = new Uint8Array(this.universe.count);
+      const oracles = this.universe.col.oracleIdx;
+      for (let i = 0; i < this.universe.count; i++) {
+        if (wanted.has(oracles[i]!)) mask[i] = 255;
+      }
+      this.starfield.setHighlight(mask);
     }
-    const mask = new Uint8Array(this.universe.count);
-    const oracles = this.universe.col.oracleIdx;
-    for (let i = 0; i < this.universe.count; i++) {
-      if (wanted.has(oracles[i]!)) mask[i] = 255;
-    }
-    this.starfield.setHighlight(mask);
+    // Collection overlay does not change matchCount, so the nebula would stay
+    // at full strength and drown the lit cards. Deck links filter, and the
+    // visible fraction already handles those.
+    this.applyNebulaDensity();
   }
 
   private consumeCue(cue: CameraCue | null): void {

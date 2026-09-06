@@ -346,6 +346,39 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
     ),
   ]);
 
+  // ---- Linked deck ----------------------------------------------------------
+  const deckCount = el('span', { className: 'mcu-deck-link-n' });
+  const deckContextBtn = el('button', {
+    className: 'mcu-deck-link-btn',
+    text: 'Show in context',
+    attrs: { type: 'button' },
+  });
+  tip(deckContextBtn, 'Keep the deck lit, but bring the rest of Magic back around it.');
+  deckContextBtn.addEventListener('click', () => store.patchFilter({ oracles: new Set() }));
+  const deckClearBtn = el('button', {
+    className: 'mcu-deck-link-btn',
+    text: 'Clear',
+    attrs: { type: 'button' },
+  });
+  tip(deckClearBtn, 'Drop the linked deck entirely.');
+  deckClearBtn.addEventListener('click', () => {
+    store.patchFilter({ oracles: new Set() });
+    store.set('highlightOracles', new Set());
+  });
+  const deckBanner = el('div', { className: 'mcu-deck-link' }, [
+    el('p', { className: 'mcu-deck-link-copy' }, [
+      document.createTextNode('Linked deck · '),
+      deckCount,
+      document.createTextNode(' unique cards'),
+    ]),
+    el('div', { className: 'mcu-deck-link-actions' }, [deckContextBtn, deckClearBtn]),
+  ]);
+  function paintDeckLink(): void {
+    const n = store.state.filter.oracles.size;
+    deckBanner.hidden = n === 0;
+    deckCount.textContent = fmtInt(n);
+  }
+
   // ---- Assembly -------------------------------------------------------------
   function paintAll(): void {
     paintColor();
@@ -354,6 +387,7 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
     paintFormats();
     paintSets();
     paintCheckboxes();
+    paintDeckLink();
     yearSlider.setValue(store.state.filter.years);
     cmcSlider.setValue(store.state.filter.cmc);
   }
@@ -371,7 +405,7 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
     resetBtn,
   ]);
   const body = el('div', { className: 'mcu-filters-body' }, [
-    header, colorSection, typeSection, raritySection, formatSection,
+    header, deckBanner, colorSection, typeSection, raritySection, formatSection,
     yearSection, cmcSection, setSection, optionsSection,
   ]);
 

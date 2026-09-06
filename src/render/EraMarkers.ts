@@ -58,8 +58,16 @@ export class EraMarkers {
       { label: String(last), year: last },
     ];
 
-    for (const era of eras) {
-      const r = radiusOfYear(ctx, era.year);
+    // ChronoRank piles Alpha and Revised close together (Magic printed little
+    // in 1993–94). A shared azimuth then stacked the sprites. Fan them a few
+    // degrees and keep a minimum radial gap so the landmarks stay distinct.
+    const MIN_GAP = 48;
+    let lastR = -Infinity;
+    for (let i = 0; i < eras.length; i++) {
+      const era = eras[i]!;
+      let r = radiusOfYear(ctx, era.year);
+      if (r - lastR < MIN_GAP) r = lastR + MIN_GAP;
+      lastR = r;
       const tex = labelTexture(era.label);
       const material = new THREE.SpriteMaterial({
         map: tex,
@@ -70,7 +78,8 @@ export class EraMarkers {
       });
       const sprite = new THREE.Sprite(material);
       sprite.scale.set(70, 70 * LABEL_ASPECT, 1);
-      sprite.position.set(r * 0.92, 28, r * 0.18);
+      const a = 0.18 + i * 0.28;
+      sprite.position.set(r * Math.cos(a), 28, r * Math.sin(a));
       sprite.renderOrder = 20;
       this.group.add(sprite);
       this.markers.push({ sprite, material, world: sprite.position.clone() });

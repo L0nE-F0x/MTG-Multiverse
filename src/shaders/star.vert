@@ -57,7 +57,11 @@ void main() {
     float legal = step(0.5, mod(floor(aFormatMask / uFormatBit), 2.0));
     vis *= mix(0.12, 1.0, legal);
   }
-  if (uHighlightOn > 0.5) vis *= mix(0.08, 1.0, aHighlight);
+  // Highlight crush must be as hard as a filter. mix(0.08, …) left 117k points
+  // contributing additive glow, so a deck overlay looked like a slightly dimmer
+  // galaxy rather than "these cards". vis=0 still leaves the uDim ghost, which
+  // is the context: the shape of Magic with the named cards standing on it.
+  if (uHighlightOn > 0.5) vis *= aHighlight;
 
   float bright = aBright * mix(uDim, 1.0, vis);
   // Filtered-out stars shrink hard as well as dimming. Brightness alone is not
@@ -85,6 +89,13 @@ void main() {
   vHighlight = max(max(hovered * 0.6, selected), max(kinHover * 0.45, kinSel * 0.7));
   clamped *= 1.0 + vHighlight * 2.2;
   bright *= 1.0 + vHighlight * 2.0;
+
+  // Deck / collection lift. Kept off vHighlight so a hundred-card list does
+  // not grow a cyan ring on every printing — that path is for hover/select.
+  if (uHighlightOn > 0.5) {
+    clamped *= 1.0 + aHighlight * 1.35;
+    bright *= 1.0 + aHighlight * 1.2;
+  }
 
   // Newest set is a bright knot on the rim — the whole printing, not one star.
   float fresh = step(abs(aSetIdx - uNewestSet), 0.5) * step(0.0, uNewestSet);

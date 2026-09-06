@@ -54,6 +54,7 @@ interface SerializedFilter {
   hideReprints: boolean;
   hideDigital: boolean;
   hideTokens: boolean;
+  oracles: number[];
 }
 
 function serializeFilter(f: FilterState): SerializedFilter {
@@ -71,11 +72,12 @@ function serializeFilter(f: FilterState): SerializedFilter {
     hideReprints: f.hideReprints,
     hideDigital: f.hideDigital,
     hideTokens: f.hideTokens,
+    oracles: [...f.oracles],
   };
 }
 
 function applyFilter(s: SerializedFilter): void {
-  const base = defaultFilter();
+  const oracles = new Set(s.oracles);
   store.patchFilter({
     colors: new Set(s.colors as ColorLetter[]),
     colorMatch: s.colorMatch,
@@ -90,8 +92,10 @@ function applyFilter(s: SerializedFilter): void {
     hideReprints: s.hideReprints,
     hideDigital: s.hideDigital,
     hideTokens: s.hideTokens,
-    oracles: base.oracles,
+    oracles,
   });
+  // A saved deck view should light the same cards it isolates.
+  store.set('highlightOracles', new Set(oracles));
 }
 
 function isFiniteNumber(v: unknown): v is number {
@@ -149,6 +153,7 @@ function readFilter(value: unknown): SerializedFilter {
     hideReprints: bool(f.hideReprints, base.hideReprints),
     hideDigital: bool(f.hideDigital, base.hideDigital),
     hideTokens: bool(f.hideTokens, base.hideTokens),
+    oracles: numbers(f.oracles),
   };
 }
 

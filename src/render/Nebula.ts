@@ -181,6 +181,7 @@ export class Nebula {
 
     const w = Math.max(1, Math.round(width * scale));
     const h = Math.max(1, Math.round(height * scale));
+    if (this.target.width === w && this.target.height === h) return;
     this.target.setSize(w, h);
     this.marchMaterial.uniforms.uResolution.value.set(w, h);
     this.invalidate();
@@ -218,7 +219,9 @@ export class Nebula {
   }
 
   setIntensity(v: number): void {
-    this.marchMaterial.uniforms.uIntensity.value = v;
+    const u = this.marchMaterial.uniforms.uIntensity;
+    if (u.value === v) return;
+    u.value = v;
     this.invalidate();
   }
 

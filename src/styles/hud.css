@@ -75,7 +75,8 @@
   color: var(--mcu-text-dim);
 }
 .mcu-command-count-n,
-.mcu-command-count-total {
+.mcu-command-count-total,
+.mcu-command-count-extra {
   color: var(--mcu-cyan);
   font-weight: 600;
 }

@@ -386,11 +386,17 @@ try {
   check('?cards= highlights every named card', highlighted.count === 3, `got ${highlighted.count} of 3`);
   check('?cards= with a comma in the name resolves', highlighted.count === 3,
     `"Narset, Parter of Veils" ${highlighted.count === 3 ? 'survived' : 'was split'}`);
-  // Highlight in context: the galaxy stays whole rather than collapsing to the
-  // deck, which is the whole point of showing a deck against everything else.
-  check('?cards= does not filter the galaxy down',
-    highlighted.filtered === 0 && highlighted.matches > 100000,
+  // Isolation is the readable view. Highlight-in-place among 117k additive
+  // points made a deck vanish; filtering is what "show this deck" actually is.
+  check('?cards= isolates the named cards',
+    highlighted.filtered === 3 && highlighted.matches < 10000,
     `${highlighted.matches.toLocaleString()} visible, filter.oracles=${highlighted.filtered}`);
+
+  const dfc = await page.evaluate(() => {
+    const u = window.__mcu.universe;
+    return u.oraclesNamed('Bonecrusher Giant').length > 0;
+  });
+  check('a DFC front-face name resolves without the // back face', dfc === true);
 
   // The first state write used to rebuild the query from scratch and forget it.
   await page.evaluate(() => {

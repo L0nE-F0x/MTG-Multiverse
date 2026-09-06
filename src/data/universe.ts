@@ -304,10 +304,23 @@ export class Universe {
     this.oracleToName = byOracle;
 
     const byName = new Map<string, number[]>();
-    for (let i = 0; i < this.lcNames.length; i++) {
-      const list = byName.get(this.lcNames[i]);
+    const add = (key: string, i: number): void => {
+      const list = byName.get(key);
       if (list) list.push(i);
-      else byName.set(this.lcNames[i], [i]);
+      else byName.set(key, [i]);
+    };
+    for (let i = 0; i < this.lcNames.length; i++) add(this.lcNames[i], i);
+    // Decklists and Arena names use the front face ("Bonecrusher Giant");
+    // Scryfall interned the split ("Bonecrusher Giant // Stomp"). Only alias
+    // a front face that is not already a real interned name — otherwise
+    // "Sol Ring" also pulls in the art-card "Sol Ring // Sol Ring".
+    for (let i = 0; i < this.lcNames.length; i++) {
+      const lc = this.lcNames[i];
+      const cut = lc.indexOf(' // ');
+      if (cut <= 0) continue;
+      const front = lc.slice(0, cut);
+      if (byName.has(front)) continue;
+      add(front, i);
     }
     this.lcNameToIdx = byName;
   }
