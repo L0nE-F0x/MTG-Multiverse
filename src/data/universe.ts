@@ -49,6 +49,14 @@ export class Universe {
   private readonly lcNames: string[];
   /** Cards sharing a name index, so a search hit can jump to its printings. */
   private nameToCards: Map<number, number[]> | null = null;
+  /**
+   * Lowercased name -> name indices, so an exact-name lookup is not a scan.
+   * A list, not a single index: `El-Hajjâj` and `El-hajjâj` are two entries in
+   * `meta.names` that differ only by case, and both carry printings.
+   */
+  private lcNameToIdx: Map<string, number[]> | null = null;
+  /** Oracle id -> name index, for turning a highlight set back into a URL. */
+  private oracleToName: Map<number, number> | null = null;
 
   constructor(meta: UniverseMeta, buf: ArrayBuffer) {
     this.meta = meta;
@@ -225,21 +233,41 @@ export class Universe {
     return -1;
   }
 
-  /** Oracle ids for an exact name (case-insensitive). */
+  /**
+   * Oracle ids for an exact name (case-insensitive).
+   *
+   * Resolving a deck link calls this once per card, so the name lookup is a
+   * map rather than a scan of all 39,849 unique names.
+   */
   oraclesNamed(name: string): number[] {
     const want = name.trim().toLowerCase();
     if (!want) return [];
+    if (!this.lcNameToIdx) this.buildNameIndex();
+    const matches = this.lcNameToIdx!.get(want);
+    if (!matches) return [];
+
     const out: number[] = [];
     const seen = new Set<number>();
-    for (let i = 0; i < this.lcNames.length; i++) {
-      if (this.lcNames[i] !== want) continue;
-      if (!this.nameToCards) this.buildNameIndex();
-      for (const c of this.nameToCards!.get(i) ?? []) {
+    for (const nameIdx of matches) {
+      for (const c of this.nameToCards!.get(nameIdx) ?? []) {
         const o = this.col.oracleIdx[c]!;
         if (!seen.has(o)) { seen.add(o); out.push(o); }
       }
     }
     return out;
+  }
+
+  /**
+   * The card name an oracle id belongs to, or '' if it matches nothing.
+   *
+   * The inverse of `oraclesNamed`, so a highlight set can be written back into
+   * `?cards=` as the names it came from rather than as indices, which are an
+   * artefact of this build of the catalogue and would not survive a rebuild.
+   */
+  nameOfOracle(oracle: number): string {
+    if (!this.oracleToName) this.buildNameIndex();
+    const idx = this.oracleToName!.get(oracle);
+    return idx === undefined ? '' : this.meta.names[idx];
   }
 
   indexOfSetCode(code: string): number {
@@ -255,16 +283,33 @@ export class Universe {
     return [...cards].sort((a, b) => day[a] - day[b]);
   }
 
+  /**
+   * Builds the three name-keyed indices in one pass over the catalogue. They
+   * are always wanted together and the pass is the expensive part, so nothing
+   * is gained by building them separately.
+   */
   private buildNameIndex(): void {
     const map = new Map<number, number[]>();
+    const byOracle = new Map<number, number>();
     const nameIdx = this.col.nameIdx;
+    const oracleIdx = this.col.oracleIdx;
     for (let i = 0; i < this.count; i++) {
       const k = nameIdx[i];
       const list = map.get(k);
       if (list) list.push(i);
       else map.set(k, [i]);
+      if (!byOracle.has(oracleIdx[i])) byOracle.set(oracleIdx[i], k);
     }
     this.nameToCards = map;
+    this.oracleToName = byOracle;
+
+    const byName = new Map<string, number[]>();
+    for (let i = 0; i < this.lcNames.length; i++) {
+      const list = byName.get(this.lcNames[i]);
+      if (list) list.push(i);
+      else byName.set(this.lcNames[i], [i]);
+    }
+    this.lcNameToIdx = byName;
   }
 }
 

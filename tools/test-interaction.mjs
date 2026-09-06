@@ -366,6 +366,234 @@ try {
   const cleared = await page.evaluate(() => window.location.search);
   check('URL clears once back to defaults', cleared === '', `search="${cleared}"`);
 
+  // --- ?cards=, and its round trip -------------------------------------------
+  // The audit found this dropped on the first state write, so the deck was
+  // gone on reload. A name with a comma in it is the other half: a tenth of
+  // all card names are "Narset, Parter of Veils", and a bare split on commas
+  // tore every one of them in half.
+  const deck = ['Sol Ring', 'Lightning Bolt', 'Narset, Parter of Veils'];
+  const cardsParam = deck.map(encodeURIComponent).join(',');
+  await page.goto(`${URL}?shell=play&cards=${cardsParam}`, {
+    waitUntil: 'domcontentloaded', timeout: 30000,
+  });
+  await page.waitForFunction('window.__mcu !== undefined', { timeout: 120000, polling: 250 });
+  await sleep(1500);
+
+  const highlighted = await page.evaluate(() => {
+    const s = window.__mcu.store.state;
+    return { count: s.highlightOracles.size, matches: s.matchCount, filtered: s.filter.oracles.size };
+  });
+  check('?cards= highlights every named card', highlighted.count === 3, `got ${highlighted.count} of 3`);
+  check('?cards= with a comma in the name resolves', highlighted.count === 3,
+    `"Narset, Parter of Veils" ${highlighted.count === 3 ? 'survived' : 'was split'}`);
+  // Highlight in context: the galaxy stays whole rather than collapsing to the
+  // deck, which is the whole point of showing a deck against everything else.
+  check('?cards= does not filter the galaxy down',
+    highlighted.filtered === 0 && highlighted.matches > 100000,
+    `${highlighted.matches.toLocaleString()} visible, filter.oracles=${highlighted.filtered}`);
+
+  // The first state write used to rebuild the query from scratch and forget it.
+  await page.evaluate(() => {
+    const u = window.__mcu.universe;
+    window.__mcu.store.set('selected', u.search('Black Lotus', 1)[0]);
+  });
+  await sleep(700);
+  const afterWrite = await page.evaluate(() => window.location.search);
+  check('?cards= survives a selection write', afterWrite.includes('cards='),
+    `search="${afterWrite}"`);
+
+  // And what it wrote has to parse back to the same three cards.
+  await page.goto(`${URL}${afterWrite}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.waitForFunction('window.__mcu !== undefined', { timeout: 120000, polling: 250 });
+  await sleep(1500);
+  const reloaded = await page.evaluate(() => window.__mcu.store.state.highlightOracles.size);
+  check('?cards= round-trips through a reload', reloaded === 3, `got ${reloaded} of 3`);
+
+  // Links the shipped host already produced encoded the whole joined string,
+  // so the separators arrived as %2C too and the list came through as a single
+  // token. Those links have to keep working.
+  const legacy = encodeURIComponent('Sol Ring,Lightning Bolt');
+  await page.goto(`${URL}?shell=play&cards=${legacy}`, {
+    waitUntil: 'domcontentloaded', timeout: 30000,
+  });
+  await page.waitForFunction('window.__mcu !== undefined', { timeout: 120000, polling: 250 });
+  await sleep(1500);
+  const legacyCount = await page.evaluate(() => window.__mcu.store.state.highlightOracles.size);
+  check('a whole-string-encoded ?cards= still resolves', legacyCount === 2,
+    `got ${legacyCount} of 2`);
+
+  // --- ?set= must not change the layout on reload ----------------------------
+  // `layout=galaxy` is omitted from the URL as the default, but the reader
+  // switches to `sets` for a bare `?set=`, so the pair has to be written out.
+  await page.goto(`${URL}?shell=play`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.waitForFunction('window.__mcu !== undefined', { timeout: 120000, polling: 250 });
+  await sleep(1200);
+  await page.evaluate(() => {
+    const idx = window.__mcu.universe.indexOfSetCode('lea');
+    window.__mcu.store.patchFilter({ sets: new Set([idx]) });
+  });
+  await sleep(700);
+  const setSearch = await page.evaluate(() => window.location.search);
+  check('?set= in the galaxy layout writes the layout too', setSearch.includes('layout=galaxy'),
+    `search="${setSearch}"`);
+  await page.goto(`${URL}${setSearch}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.waitForFunction('window.__mcu !== undefined', { timeout: 120000, polling: 250 });
+  await sleep(1200);
+  const setLayout = await page.evaluate(() => window.__mcu.store.state.layout);
+  check('?set= reload keeps the galaxy layout', setLayout === 'galaxy', `got "${setLayout}"`);
+
+  // --- ?shell=play skips the title ------------------------------------------
+  const shellState = await page.evaluate(() => ({
+    shell: window.__mcu.store.state.shell,
+    titleOpen: !!document.querySelector('.mcu-title--open'),
+  }));
+  check('?shell=play skips the title screen',
+    shellState.shell === 'play' && !shellState.titleOpen, `shell="${shellState.shell}"`);
+
+  // --- the nebula controls work with the camera at rest ----------------------
+  // With auto-rotate off the march is cached frame to frame, and every uniform
+  // on the march material — the nebula toggle, the intensity slider, the
+  // filter-driven density — used to be unable to reach the screen at all.
+  await page.evaluate(() => {
+    window.__mcu.store.patchVisual({ autoRotate: false, showNebula: true });
+  });
+  await settleCamera(page);
+  // Past the 0.35s idle threshold and past the density ease, so the cache is
+  // genuinely live — a settled nebula skips every frame.
+  await sleep(2500);
+
+  const cached = await page.evaluate(() => new Promise((resolve) => {
+    const app = window.__mcu.app;
+    let skipped = 0, frames = 0;
+    const tick = () => {
+      frames++;
+      if (app.nebula.skipRender) skipped++;
+      if (frames < 60) requestAnimationFrame(tick);
+      else resolve({ skipped, frames });
+    };
+    requestAnimationFrame(tick);
+  }));
+  check('nebula march is cached while the camera rests',
+    cached.skipped > cached.frames * 0.9, `skipped ${cached.skipped}/${cached.frames}`);
+
+  const woken = await page.evaluate(() => new Promise((resolve) => {
+    const app = window.__mcu.app;
+    window.__mcu.store.patchVisual({ showNebula: false });
+    let marched = 0, frames = 0;
+    const tick = () => {
+      frames++;
+      if (!app.nebula.skipRender) marched++;
+      if (frames < 90) requestAnimationFrame(tick);
+      else resolve({ marched, frames, density: app.nebula.marchMaterial.uniforms.uDensity.value });
+    };
+    requestAnimationFrame(tick);
+  }));
+  check('toggling the nebula off reaches the screen with the camera at rest',
+    woken.marched > 0, `marched ${woken.marched}/${woken.frames} frames`);
+  check('nebula density actually falls to zero', woken.density < 0.01,
+    `uDensity=${woken.density.toFixed(3)}`);
+  await page.evaluate(() => window.__mcu.store.patchVisual({ showNebula: true, autoRotate: true }));
+
+  // --- bookmarks -------------------------------------------------------------
+  // Naming a view used to go through window.prompt, which resolves to null
+  // under WKWebView — so on macOS the button silently did nothing.
+  const bookmark = await page.evaluate(async () => {
+    localStorage.removeItem('aetherfield.bookmarks.v1');
+    const wrap = document.querySelector('.mcu-bookmarks-wrap');
+    const toggle = wrap?.querySelector('.mcu-bookmarks-toggle');
+    if (!(toggle instanceof HTMLButtonElement)) return { error: 'no toggle' };
+    toggle.click();
+    const save = wrap.querySelector('.mcu-bookmarks-save');
+    if (!(save instanceof HTMLButtonElement)) return { error: 'no save button' };
+    save.click();
+    const input = wrap.querySelector('.mcu-bookmarks-name');
+    if (!(input instanceof HTMLInputElement)) return { error: 'no inline name field' };
+    input.value = 'Test view';
+    const confirm = wrap.querySelector('.mcu-bookmarks-confirm');
+    if (!(confirm instanceof HTMLButtonElement)) return { error: 'no confirm button' };
+    confirm.click();
+    await new Promise((r) => setTimeout(r, 100));
+    const stored = JSON.parse(localStorage.getItem('aetherfield.bookmarks.v1') ?? '[]');
+    return { names: [...wrap.querySelectorAll('.mcu-bookmarks-go')].map((b) => b.textContent), stored };
+  });
+  check('saving a view needs no window.prompt', !bookmark.error, bookmark.error ?? '');
+  check('the saved view is listed and persisted',
+    bookmark.names?.includes('Test view') && bookmark.stored?.length === 1,
+    `listed ${JSON.stringify(bookmark.names ?? [])}`);
+
+  // A hand-edited store entry must not reach the renderer as a live layout
+  // name or a NaN camera pose. Storage is shared with whatever else lives on
+  // this origin — inside a host app, that is the host.
+  await page.evaluate(() => {
+    localStorage.setItem('aetherfield.bookmarks.v1', JSON.stringify([
+      { id: 'x', name: 'Bad', layout: 'not-a-layout', camera: null, filter: 'nope' },
+    ]));
+  });
+  await page.goto(`${URL}?shell=play`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.waitForFunction('window.__mcu !== undefined', { timeout: 120000, polling: 250 });
+  await sleep(1200);
+  const hostile = await page.evaluate(async () => {
+    const wrap = document.querySelector('.mcu-bookmarks-wrap');
+    wrap?.querySelector('.mcu-bookmarks-toggle')?.click();
+    const go = wrap?.querySelector('.mcu-bookmarks-go');
+    if (!(go instanceof HTMLButtonElement)) return { error: 'corrupt bookmark was not listed' };
+    go.click();
+    await new Promise((r) => setTimeout(r, 600));
+    const app = window.__mcu.app;
+    return {
+      layout: window.__mcu.store.state.layout,
+      distance: app.rig.distance,
+      x: app.camera.position.x,
+    };
+  });
+  check('a corrupt bookmark cannot push the renderer somewhere it cannot draw',
+    !hostile.error && hostile.layout === 'galaxy' &&
+    Number.isFinite(hostile.distance) && Number.isFinite(hostile.x),
+    hostile.error ?? `layout="${hostile.layout}" distance=${hostile.distance}`);
+  await page.evaluate(() => localStorage.removeItem('aetherfield.bookmarks.v1'));
+
+  // --- the embed message channel ---------------------------------------------
+  // The host drives highlighting over postMessage. Nothing else in the suite
+  // frames the app, so nothing else exercises embed.ts at all.
+  const embed = await page.evaluate(async (base) => {
+    const frame = document.createElement('iframe');
+    frame.style.cssText = 'position:fixed;left:-9999px;width:900px;height:600px';
+    frame.src = `${base}?shell=play`;
+    const ready = new Promise((resolve) => {
+      const onMsg = (e) => {
+        if (e.data?.source === 'aetherfield' && e.data.type === 'ready') {
+          window.removeEventListener('message', onMsg);
+          resolve(e.data);
+        }
+      };
+      window.addEventListener('message', onMsg);
+      setTimeout(() => resolve(null), 90000);
+    });
+    document.body.append(frame);
+    const readyMsg = await ready;
+    if (!readyMsg) { frame.remove(); return { error: 'no ready ping' }; }
+
+    const names = ['Sol Ring', 'Counterspell'];
+    frame.contentWindow.postMessage({ source: 'aetherfield', type: 'highlight', names }, '*');
+    await new Promise((r) => setTimeout(r, 600));
+    const applied = frame.contentWindow.__mcu.store.state.highlightOracles.size;
+
+    frame.contentWindow.postMessage({ source: 'aetherfield', type: 'clear-highlight' }, '*');
+    await new Promise((r) => setTimeout(r, 400));
+    const cleared = frame.contentWindow.__mcu.store.state.highlightOracles.size;
+
+    const skipped = !frame.contentDocument.querySelector('.mcu-title--open');
+    frame.remove();
+    return { cards: readyMsg.cards, applied, cleared, skipped };
+  }, URL);
+  check('an embedded frame posts its ready ping', !embed.error && embed.cards > 100000,
+    embed.error ?? `${(embed.cards ?? 0).toLocaleString()} cards`);
+  check('the host highlight message reaches the store', embed.applied === 2,
+    `got ${embed.applied} of 2`);
+  check('the host clear-highlight message empties it', embed.cleared === 0,
+    `got ${embed.cleared}`);
+  check('an embedded frame skips the title screen', embed.skipped === true);
+
   check('no uncaught page errors', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 } finally {
   await browser.close();

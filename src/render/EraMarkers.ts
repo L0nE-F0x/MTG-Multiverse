@@ -1,12 +1,36 @@
 import * as THREE from 'three';
-import { GALAXY_CORE, GALAXY_RADIUS } from '../layout/layouts.ts';
+import { GALAXY_CORE, GALAXY_RADIUS, type LayoutContext } from '../layout/layouts.ts';
 import type { LayoutMode } from '../core/store.ts';
-import type { Universe } from '../data/universe.ts';
 
 interface Marker {
   sprite: THREE.Sprite;
   material: THREE.SpriteMaterial;
   world: THREE.Vector3;
+}
+
+/** Label texture dimensions; the sprite has to keep this aspect or it stretches. */
+const LABEL_W = 320;
+const LABEL_H = 64;
+const LABEL_ASPECT = LABEL_H / LABEL_W;
+
+/**
+ * Radius of the ring holding the first card released in `year`.
+ *
+ * It has to be derived the way `layouts.ts::galaxy` derives a card's radius —
+ * from `chronoRank`, a percentile over all 117,621 printings — and not from
+ * the year's position between the first and last. Magic's print rate is
+ * nowhere near flat: by linear year fraction the "Modern" marker landed at
+ * r=190 while 2003's cards actually sit at r=129, nearly a fifth of the disc
+ * radius out from the ring it was labelling.
+ */
+function radiusOfYear(ctx: LayoutContext, year: number): number {
+  const { chronoOrder, chronoRank, universe } = ctx;
+  let t = 1;
+  for (let r = 0; r < chronoOrder.length; r++) {
+    const i = chronoOrder[r]!;
+    if (universe.year[i]! >= year) { t = chronoRank[i]!; break; }
+  }
+  return GALAXY_CORE + (GALAXY_RADIUS - GALAXY_CORE) * Math.sqrt(Math.max(0, Math.min(1, t)));
 }
 
 /**
@@ -21,23 +45,21 @@ export class EraMarkers {
   private opacity = 1;
   private target = 1;
 
-  constructor(universe: Universe) {
-    let yearMax = 1993;
-    for (let i = 0; i < universe.count; i++) yearMax = Math.max(yearMax, universe.year[i]!);
-    yearMax = Math.max(yearMax, new Date().getUTCFullYear());
-    const yearMin = 1993;
-    const now = new Date().getUTCFullYear();
+  constructor(ctx: LayoutContext) {
+    // The catalogue's own last year, not the wall clock. Once the runtime year
+    // passes the year the data was built, a `new Date()` label names a ring
+    // that has no cards on it and every marker drifts against the stars.
+    const last = ctx.yearMax;
 
     const eras: { label: string; year: number }[] = [
       { label: 'Alpha', year: 1993 },
       { label: 'Revised', year: 1994 },
       { label: 'Modern', year: 2003 },
-      { label: String(now), year: now },
+      { label: String(last), year: last },
     ];
 
     for (const era of eras) {
-      const t = (era.year - yearMin) / Math.max(1, yearMax - yearMin);
-      const r = GALAXY_CORE + (GALAXY_RADIUS - GALAXY_CORE) * Math.sqrt(Math.max(0, Math.min(1, t)));
+      const r = radiusOfYear(ctx, era.year);
       const tex = labelTexture(era.label);
       const material = new THREE.SpriteMaterial({
         map: tex,
@@ -47,7 +69,7 @@ export class EraMarkers {
         opacity: 0.9,
       });
       const sprite = new THREE.Sprite(material);
-      sprite.scale.set(70, 70 * (64 / 320), 1);
+      sprite.scale.set(70, 70 * LABEL_ASPECT, 1);
       sprite.position.set(r * 0.92, 28, r * 0.18);
       sprite.renderOrder = 20;
       this.group.add(sprite);
@@ -71,7 +93,7 @@ export class EraMarkers {
       m.material.opacity = 0.82 * this.opacity;
       const d = m.world.distanceTo(this.camPos);
       const s = Math.max(28, Math.min(90, d * 0.08));
-      m.sprite.scale.set(s, s * 0.22, 1);
+      m.sprite.scale.set(s, s * LABEL_ASPECT, 1);
     }
   }
 
@@ -85,8 +107,8 @@ export class EraMarkers {
 }
 
 function labelTexture(text: string): THREE.CanvasTexture {
-  const w = 320;
-  const h = 64;
+  const w = LABEL_W;
+  const h = LABEL_H;
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;

@@ -115,6 +115,12 @@ export function connectEmbed(): () => void {
 export function onHostMessage(handler: (msg: InboundMessage) => void): () => void {
   if (!isEmbedded()) return () => {};
   const onMessage = (event: MessageEvent): void => {
+    // Only the host we are framed in gets to drive us. Checking the sender
+    // rather than an origin string is what works in both deployments: the
+    // vendored copy is same-origin, but if the host ever loads this over the
+    // network there is no origin here to compare against. This mirrors the
+    // `event.source` test the host side already makes on our messages.
+    if (event.source !== window.parent) return;
     const data = event.data;
     if (!data || typeof data !== 'object') return;
     if ((data as { source?: unknown }).source !== EMBED_CHANNEL) return;

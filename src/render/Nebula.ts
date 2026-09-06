@@ -81,11 +81,24 @@ export class Nebula {
   private width = 1;
   private height = 1;
   private targetDensity = 1;
-  private clusterTex: THREE.DataTexture;
-  private frozenTime = 0;
+  /**
+   * The 1×1 placeholder used until a layout supplies real clusters. Held
+   * separately because the uniform stops pointing at it the moment the sets
+   * layout is entered, and it was previously never freed.
+   */
+  private readonly dummyTex: THREE.DataTexture;
   private skipRender = false;
   private lastPose = '';
   private baseSteps = 52;
+  /** Set whenever a march uniform changes; see `invalidate`. */
+  private dirty = true;
+  /**
+   * Baked cluster maps, keyed by layout. `setClusterAttribs` is a pure
+   * function of the catalogue, so a layout's map never changes within a
+   * session and re-baking it on every visit is 128² × 1,049 `exp()` calls on
+   * the main thread for an identical result — about three dropped frames.
+   */
+  private clusterCache = new Map<LayoutMode, { texture: THREE.DataTexture; extent: number }>();
 
   constructor(scale = 0.5) {
     this.scale = scale;
@@ -126,7 +139,7 @@ export class Nebula {
       depthTest: false,
       depthWrite: false,
     });
-    this.clusterTex = this.marchMaterial.uniforms.uClusterMap.value as THREE.DataTexture;
+    this.dummyTex = this.marchMaterial.uniforms.uClusterMap.value as THREE.DataTexture;
     this.marchScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.marchMaterial));
 
     this.compositeMaterial = new THREE.ShaderMaterial({
@@ -170,6 +183,7 @@ export class Nebula {
     const h = Math.max(1, Math.round(height * scale));
     this.target.setSize(w, h);
     this.marchMaterial.uniforms.uResolution.value.set(w, h);
+    this.invalidate();
   }
 
   /** Render scale for the volume pass, 0.25 (fast) to 1 (sharp). */
@@ -178,6 +192,7 @@ export class Nebula {
     this.baseSteps = steps;
     this.marchMaterial.uniforms.uSteps.value = steps;
     this.setSize(this.width, this.height);
+    this.invalidate();
   }
 
   setLayout(
@@ -191,29 +206,61 @@ export class Nebula {
       this.marchMaterial.uniforms.uYearCount.value = Math.max(1, opts.yearMax - opts.yearMin);
     }
     if (opts.clusters && opts.clusters.length >= 4) {
-      const baked = bakeClusterMap(opts.clusters);
-      const prev = this.clusterTex;
-      this.clusterTex = baked.texture;
+      let baked = this.clusterCache.get(mode);
+      if (!baked) {
+        baked = bakeClusterMap(opts.clusters);
+        this.clusterCache.set(mode, baked);
+      }
       this.marchMaterial.uniforms.uClusterMap.value = baked.texture;
       this.marchMaterial.uniforms.uClusterExtent.value = baked.extent;
-      if (prev && prev.image.width > 1) prev.dispose();
     }
+    this.invalidate();
   }
 
-  setIntensity(v: number): void { this.marchMaterial.uniforms.uIntensity.value = v; }
+  setIntensity(v: number): void {
+    this.marchMaterial.uniforms.uIntensity.value = v;
+    this.invalidate();
+  }
 
   /** Uniform scale of the disc relative to the galaxy layout (1 = galaxy). */
   setWorldScale(v: number): void {
-    this.marchMaterial.uniforms.uWorldScale.value = Math.max(0.05, v);
+    const next = Math.max(0.05, v);
+    const u = this.marchMaterial.uniforms.uWorldScale;
+    if (u.value === next) return;
+    u.value = next;
+    this.invalidate();
   }
 
   /** Density is eased rather than set, so layout changes do not pop the gas. */
-  setDensity(v: number): void { this.targetDensity = v; }
+  setDensity(v: number): void {
+    if (this.targetDensity === v) return;
+    this.targetDensity = v;
+    this.invalidate();
+  }
+
   update(dt: number): void {
     const u = this.marchMaterial.uniforms.uDensity;
-    const k = 1 - Math.exp(-dt * 2.2);
-    u.value += (this.targetDensity - u.value) * k;
+    const gap = this.targetDensity - u.value;
+    if (Math.abs(gap) < 1e-4) {
+      u.value = this.targetDensity;
+      return;
+    }
+    u.value += gap * (1 - Math.exp(-dt * 2.2));
+    // The ease runs over many frames, and every one of them is a uniform the
+    // cached target does not have yet.
+    this.invalidate();
   }
+
+  /**
+   * Force the next frame to actually march.
+   *
+   * `prepareFrame` reuses the last target whenever the camera has not moved,
+   * and the composite pass does nothing but blit it — so a uniform changed
+   * while the camera is at rest never reaches the screen on its own. With
+   * auto-rotate off (a persisted setting) that silently disabled the nebula
+   * toggle, the intensity slider and the filter-driven density change.
+   */
+  invalidate(): void { this.dirty = true; }
 
   /**
    * Skip the march when the camera has not moved (reuse last target) and cut
@@ -222,7 +269,7 @@ export class Nebula {
    */
   prepareFrame(camera: THREE.PerspectiveCamera, distance: number, bound: number, moving: boolean): void {
     const pose = `${camera.position.x.toFixed(1)}|${camera.position.y.toFixed(1)}|${camera.position.z.toFixed(1)}`;
-    this.skipRender = !moving && pose === this.lastPose;
+    this.skipRender = !this.dirty && !moving && pose === this.lastPose;
     this.lastPose = pose;
     const far = distance > bound * 1.85;
     const steps = far ? Math.max(16, Math.round(this.baseSteps * 0.55)) : this.baseSteps;
@@ -231,9 +278,9 @@ export class Nebula {
 
   render(renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera, time: number): void {
     if (this.skipRender) return;
+    this.dirty = false;
     const u = this.marchMaterial.uniforms;
-    this.frozenTime = time;
-    u.uTime.value = this.frozenTime;
+    u.uTime.value = time;
     u.uInvProjection.value.copy(camera.projectionMatrixInverse);
     u.uCameraWorld.value.copy(camera.matrixWorld);
     camera.getWorldPosition(u.uCamPos.value);
@@ -246,7 +293,9 @@ export class Nebula {
 
   dispose(): void {
     this.target.dispose();
-    this.clusterTex.dispose();
+    this.dummyTex.dispose();
+    for (const baked of this.clusterCache.values()) baked.texture.dispose();
+    this.clusterCache.clear();
     this.marchMaterial.uniforms.uNoise.value?.dispose();
     this.marchMaterial.dispose();
     this.compositeMaterial.dispose();

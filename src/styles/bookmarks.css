@@ -63,3 +63,23 @@
   cursor: pointer;
 }
 .mcu-bookmarks-del:hover { color: var(--mcu-danger); }
+.mcu-bookmarks-namerow { display: flex; gap: 6px; margin-bottom: 8px; }
+.mcu-bookmarks-name {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--mcu-border);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--mcu-text);
+  font: 500 12px/1.2 var(--mcu-font);
+}
+.mcu-bookmarks-name:focus { outline: none; border-color: var(--mcu-cyan); }
+.mcu-bookmarks-confirm {
+  padding: 5px 10px;
+  border: 1px solid var(--mcu-border);
+  background: transparent;
+  color: var(--mcu-cyan);
+  font: 600 11px/1.2 var(--mcu-font);
+  cursor: pointer;
+}
+.mcu-bookmarks-confirm:hover { border-color: var(--mcu-cyan); }

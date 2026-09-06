@@ -13,6 +13,48 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 # ▶ START HERE — next session
 
+**2026-09-06 — the v3.7.0 audit is cleared. `AUDIT-2026-09-05.md` is done.**
+
+Every finding in that file is fixed, across both repos. Nothing is committed
+yet in either; both working trees hold the changes.
+
+Three that were hurting live users:
+
+- **`?cards=` survives now.** The writer never re-emitted it, so the deck died
+  on the first click. It also **highlights instead of filtering** — the owner
+  chose that: a 100-card list filtered down is a few thousand points on an
+  empty field, and the host's `highlight` message already worked that way, so
+  the two entry points agree at last.
+- **The nebula controls work with auto-rotate off.** The march is cached
+  between frames, and no uniform change invalidated it, so one persisted
+  checkbox killed the nebula toggle, the intensity slider and the
+  filter-driven density. `Nebula.invalidate()` is the rule now — see
+  `CLAUDE.md`.
+- **FND's `additionalBrowserArgs`** replaced wry's defaults wholesale
+  (`unwrap_or_else`), re-enabling `msSmartScreenProtection` on Windows in an
+  app that sells local-only. Verified in the pinned crate source.
+
+**A bug the audit missed, worth knowing:** `?cards=` was broken for *every
+commander*. A tenth of card names contain a comma, the list was built as
+`encodeURIComponent(names.join(','))`, and after decoding nothing could tell a
+separator from "Narset, Parter of Veils". Both sides now encode per token; the
+reader re-splits an unresolved token so already-shared links still work. The
+convention is written down in `CLAUDE.md` → *Embedding in a host app*.
+
+Also done: era markers now sit on the rings their cards are actually on (Modern
+was out by 19% of the disc radius); bookmarks lost `window.prompt`, which is a
+no-op under WKWebView so "Save this view" did nothing at all on macOS, and now
+validate what they read back; the cluster map is cached, so a galaxy→sets
+switch went 48ms → 14ms.
+
+Interaction suite is **55/55**, up from 36 — the new checks cover `?cards=`,
+`?set=`, `?shell=`, the embed message channel, bookmarks and the nebula
+controls, which is exactly where these bugs were hiding.
+
+**Still open, deliberately:** FND has four more module-level `t()` call sites in
+`Sets.tsx` (219, 610, 766, 777) with the same memo-fragility as the one fixed.
+Not touched — out of the audit's scope.
+
 **2026-09-05 — FND v3.7.0 shipped the title screen and deep links.**
 
 Filthy Net Deck v3.7.0 vendors this build. Sidebar opens on the title

@@ -60,14 +60,23 @@ re-running `data:build` — the loader refuses a mismatched version on purpose.
   Lotus and get whatever floated in front of it. Nothing occludes anything in an
   additively-blended starfield, so camera depth carries no meaning here. This is
   also why `pick.frag` is GLSL3: GLSL1 has no `gl_FragDepth`.
-- **An async readback that never settles wedges picking permanently.**
-  `readRenderTargetPixelsAsync` occasionally neither resolves nor rejects. The
-  first version kept a single `inFlight` flag, so one hung read silently blocked
-  every later pick and hover simply stopped. It self-heals as soon as the mouse
-  moves in normal use, which is why it presented as a ~50% test flake with a
-  stationary cursor rather than an obvious bug. `Picker` now abandons a read
-  after `STALL_MS` and tags each request with a generation so a late reply from
-  an abandoned one cannot clobber a newer result.
+- **Picking reads back synchronously, and should stay that way.** The pick pass
+  is scissored to the single pixel under the cursor, so `readPixels` on a 1×1
+  target costs microseconds and the stall cannot happen. The async path it
+  replaced (`readRenderTargetPixelsAsync`) occasionally neither resolved nor
+  rejected; with a single `inFlight` flag one hung read silently blocked every
+  later pick and hover simply stopped. It self-healed as soon as the mouse
+  moved, which is why it presented as a ~50% test flake with a stationary
+  cursor rather than an obvious bug. If picking ever goes async again it needs
+  both a stall timeout and a generation tag per request, or that returns.
+- **The nebula caches its march, so a uniform change needs `invalidate()`.**
+  `prepareFrame` reuses the last render target whenever the camera has not
+  moved, and the composite pass does nothing but blit it. Anything that writes
+  a uniform on `marchMaterial` — density, intensity, layout, world scale — must
+  therefore mark the cache dirty or it never reaches the screen. This was
+  invisible for a long time because `autoRotate` defaults to true and the
+  camera never stops; turn it off (a persisted checkbox) and the nebula toggle,
+  the intensity slider and the filter-driven density all went dead.
 - **A translucent background cannot mask scrolled content.** The intro's sticky
   CTA used `var(--mcu-panel-bg)` (0.78 alpha) and the controls list showed
   straight through it. Anything that has to occlude needs a near-opaque colour,
@@ -94,6 +103,19 @@ looks like a pointless detail until it is missing:
   The ping is not decoration: an iframe fires `load` for a 404 page exactly as
   it does for a real one, so from outside there is no other way to tell a
   missing bundle from a slow boot.
+- **`?cards=` is a list of *individually* encoded tokens.** One tenth of all
+  card names contain a comma — every "Narset, Parter of Veils", which is to say
+  every commander — so a list built as `encodeURIComponent(names.join(','))`
+  arrives with the separators and the commas inside names both decoded to bare
+  commas, and nothing can tell them apart. Producers write
+  `names.map(encodeURIComponent).join(',')`; the reader takes the *raw* query
+  value (not `URLSearchParams.get`, which decodes too early) and decodes each
+  token on its own. A token that fails to resolve is re-split on its commas,
+  which is what keeps links from before this convention working.
+- **`?cards=` highlights, it does not filter.** A hundred-card list reduced to
+  its own printings is a few thousand scattered points on an empty field; where
+  those cards sit relative to everything else is the only thing worth showing.
+  The host's `highlight` message does the same, so both ways in agree.
 - **`?shell=play` skips the title screen.** A host has already asked "do you
   want this?" with the button that opened us. `connectUrlState` only echoes the
   parameter back when it was supplied, so the public site keeps a clean URL.

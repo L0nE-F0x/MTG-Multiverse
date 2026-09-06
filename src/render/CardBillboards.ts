@@ -50,6 +50,8 @@ export class CardBillboards {
   private readonly tmp = new THREE.Vector3();
   private readonly raycaster = new THREE.Raycaster();
   private readonly ndc = new THREE.Vector2();
+  /** Scratch for `hitTest`, so the per-frame raycast does not allocate. */
+  private readonly hits: THREE.Intersection[] = [];
 
   /** Scratch for candidate selection, reused to avoid per-frame allocation. */
   private readonly candIdx = new Int32Array(MAX_VISIBLE);
@@ -104,14 +106,20 @@ export class CardBillboards {
     this.raycaster.setFromCamera(this.ndc, camera);
     let best = -1;
     let bestDist = Infinity;
+    // One array, reused: this runs for every slot on every frame the pointer is
+    // over the canvas, and `intersectObject` allocates a fresh result array on
+    // each call unless it is handed one to fill.
+    const hits = this.hits;
     for (const slot of this.slots) {
       if (!slot.sprite.visible || slot.opacity < 0.12 || slot.card < 0) continue;
-      const hits = this.raycaster.intersectObject(slot.sprite, false);
+      hits.length = 0;
+      this.raycaster.intersectObject(slot.sprite, false, hits);
       if (hits.length > 0 && hits[0]!.distance < bestDist) {
         bestDist = hits[0]!.distance;
         best = slot.card;
       }
     }
+    hits.length = 0;
     return best;
   }
 

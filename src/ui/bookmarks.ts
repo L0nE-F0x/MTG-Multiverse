@@ -1,3 +1,12 @@
+/**
+ * The saved-views panel.
+ *
+ * Naming a view uses an inline field rather than `window.prompt`. wry ships no
+ * `WKUIDelegate` text-input panel, so under WKWebView — every macOS build of
+ * the host app — `prompt()` resolves to `null` and the button silently does
+ * nothing at all. It also sidesteps the wider hazard that a modal dialog
+ * blocks the whole webview.
+ */
 import { addBookmark, applyBookmark, loadBookmarks, removeBookmark, type Bookmark } from '../core/bookmarks.ts';
 import { store } from '../core/store.ts';
 import { el, listen } from './dom.ts';
@@ -14,9 +23,27 @@ export function mountBookmarks(root: HTMLElement, host: BookmarkHost): { destroy
     text: 'Save this view',
     attrs: { type: 'button' },
   });
+  const nameInput = el('input', {
+    className: 'mcu-bookmarks-name',
+    attrs: {
+      type: 'text',
+      placeholder: 'Name this view',
+      maxlength: 60,
+      'aria-label': 'Name this view',
+    },
+  });
+  const confirmBtn = el('button', {
+    className: 'mcu-bookmarks-confirm',
+    text: 'Save',
+    attrs: { type: 'button' },
+  });
+  const nameRow = el('div', { className: 'mcu-bookmarks-namerow' }, [nameInput, confirmBtn]);
+  nameRow.hidden = true;
+
   const panel = el('div', { className: 'mcu-bookmarks mcu-glass-panel' }, [
     el('div', { className: 'mcu-bookmarks-title', text: 'Saved views' }),
     saveBtn,
+    nameRow,
     listEl,
   ]);
   const toggle = el('button', {
@@ -46,10 +73,38 @@ export function mountBookmarks(root: HTMLElement, host: BookmarkHost): { destroy
   }
   paint(loadBookmarks());
 
+  /** Snapshot taken when naming opens, so the camera can keep moving meanwhile. */
+  let pending: ReturnType<BookmarkHost['cameraSnapshot']> | null = null;
+
+  const closeNaming = (): void => {
+    pending = null;
+    nameRow.hidden = true;
+    saveBtn.hidden = false;
+  };
+
+  const commit = (): void => {
+    if (!pending) return;
+    const name = nameInput.value.trim() || store.state.layout;
+    paint(addBookmark(name, pending));
+    closeNaming();
+  };
+
   const offSave = listen(saveBtn, 'click', () => {
-    const name = window.prompt('Name this view', store.state.layout);
-    if (!name) return;
-    paint(addBookmark(name, host.cameraSnapshot()));
+    pending = host.cameraSnapshot();
+    nameInput.value = store.state.layout;
+    nameRow.hidden = false;
+    saveBtn.hidden = true;
+    nameInput.focus();
+    nameInput.select();
+  });
+  const offConfirm = listen(confirmBtn, 'click', commit);
+  const offKeys = listen(nameInput, 'keydown', (ev) => {
+    const e = ev as KeyboardEvent;
+    // The canvas listens for flight keys on window; typing a view called
+    // "Wedge" should not fly the camera across the galaxy.
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    else if (e.key === 'Escape') { e.preventDefault(); closeNaming(); }
   });
   const offToggle = listen(toggle, 'click', () => {
     const open = panel.hidden;
@@ -58,6 +113,7 @@ export function mountBookmarks(root: HTMLElement, host: BookmarkHost): { destroy
   });
   const sync = (): void => {
     wrap.classList.toggle('mcu-bookmarks-wrap--hidden', store.state.shell !== 'play');
+    if (store.state.shell !== 'play') closeNaming();
   };
   sync();
   const offShell = store.on('shell', sync);
@@ -65,6 +121,8 @@ export function mountBookmarks(root: HTMLElement, host: BookmarkHost): { destroy
   return {
     destroy() {
       offSave();
+      offConfirm();
+      offKeys();
       offToggle();
       offShell();
       wrap.remove();

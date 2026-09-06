@@ -2,9 +2,15 @@
  * Two-way sync between the URL and the store, so any view can be linked to.
  *
  * `?card=<scryfall-uuid>` opens that card, `?layout=<mode>` picks the
- * arrangement, and `?shell=play` skips the title screen. Writes use
- * replaceState so that flying around the galaxy does not fill the browser's
- * history with hundreds of entries.
+ * arrangement, `?set=<code>` filters to one set, `?cards=` lights up a deck,
+ * and `?shell=play` skips the title screen. Writes use replaceState so that
+ * flying around the galaxy does not fill the browser's history with hundreds
+ * of entries.
+ *
+ * Everything the reader understands, the writer emits again. That is not
+ * tidiness: a parameter the writer forgets is a parameter that survives only
+ * until the first click, which is how `?cards=` used to lose the deck it was
+ * opened with.
  */
 import { store, type LayoutMode, type ShellMode } from './store.ts';
 import type { Universe } from '../data/universe.ts';
@@ -17,6 +23,82 @@ const isShell = (v: string | null): v is ShellMode => v === 'title' || v === 'pl
 
 /** True when a host (or ?shell=play) asked us not to run the cinematic intro. */
 export let skipCinematic = false;
+
+/**
+ * The raw, still-encoded value of a query parameter.
+ *
+ * `URLSearchParams.get` decodes, and for `cards=` that is lossy: a tenth of all
+ * card names contain a comma (every "Narset, Parter of Veils"), so once the
+ * separators and the commas inside names are both bare commas there is no way
+ * to tell them apart. Reading the raw value lets each token be decoded on its
+ * own, with `%2C` staying inside the name it belongs to.
+ */
+function rawParam(search: string, key: string): string | null {
+  for (const pair of search.replace(/^\?/, '').split('&')) {
+    const eq = pair.indexOf('=');
+    if (eq < 0) continue;
+    if (pair.slice(0, eq) === key) return pair.slice(eq + 1);
+  }
+  return null;
+}
+
+/** Percent-decoding that yields null instead of throwing on a malformed token. */
+function decodeToken(raw: string): string | null {
+  try {
+    return decodeURIComponent(raw.replace(/\+/g, ' ')).trim();
+  } catch {
+    // One bad `%` sequence in a shared link should cost that card, not the
+    // whole boot — this throw used to propagate out into main()'s catch and
+    // put up the error screen.
+    return null;
+  }
+}
+
+/**
+ * Oracle ids named by a `cards=` value: a comma-separated list of
+ * percent-encoded card names or Scryfall uuids.
+ *
+ * Tokens that do not resolve are re-split on any commas they contain, which is
+ * what makes links from before per-token encoding still work: those arrive as
+ * one token holding the entire list.
+ */
+function parseCards(universe: Universe, raw: string): Set<number> {
+  const oracles = new Set<number>();
+
+  const take = (token: string): boolean => {
+    if (!token) return false;
+    const i = universe.indexOfUuid(token);
+    if (i >= 0) {
+      oracles.add(universe.col.oracleIdx[i]!);
+      return true;
+    }
+    const named = universe.oraclesNamed(token);
+    for (const o of named) oracles.add(o);
+    return named.length > 0;
+  };
+
+  for (const part of raw.split(',')) {
+    const token = decodeToken(part);
+    if (token === null) continue;
+    if (take(token)) continue;
+    if (!token.includes(',')) continue;
+    for (const legacy of token.split(',')) take(legacy.trim());
+  }
+  return oracles;
+}
+
+/** A `cards=` value for the oracle ids currently highlighted. */
+function formatCards(universe: Universe, oracles: Set<number>): string {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const o of oracles) {
+    const name = universe.nameOfOracle(o);
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    names.push(encodeURIComponent(name));
+  }
+  return names.join(',');
+}
 
 export function connectUrlState(universe: Universe): () => void {
   const params = new URLSearchParams(window.location.search);
@@ -49,20 +131,17 @@ export function connectUrlState(universe: Universe): () => void {
     } else console.warn(`[mcu] no set matches ?set=${setCode}`);
   }
 
-  const cardsParam = params.get('cards');
-  if (cardsParam) {
-    const oracles = new Set<number>();
-    for (const token of cardsParam.split(',')) {
-      const t = token.trim();
-      if (!t) continue;
-      const i = universe.indexOfUuid(t);
-      if (i >= 0) oracles.add(universe.col.oracleIdx[i]!);
-      else for (const o of universe.oraclesNamed(decodeURIComponent(t))) oracles.add(o);
-    }
-    if (oracles.size > 0) {
-      store.patchFilter({ oracles });
-      store.set('highlightOracles', new Set(oracles));
-    }
+  // A deck lights up where it sits; it does not filter the galaxy down to
+  // itself. A hundred-card list reduced to its own printings is a few thousand
+  // scattered points on an empty field — the one thing worth seeing, which is
+  // where those cards live relative to everything else, is exactly what
+  // filtering throws away. This is also what the host's `highlight` message
+  // does, so both ways in agree.
+  const cardsRaw = rawParam(window.location.search, 'cards');
+  if (cardsRaw) {
+    const oracles = parseCards(universe, cardsRaw);
+    if (oracles.size > 0) store.set('highlightOracles', oracles);
+    else console.warn('[mcu] no cards matched ?cards=');
   }
 
   let queued = 0;
@@ -74,14 +153,23 @@ export function connectUrlState(universe: Universe): () => void {
       queued = 0;
       const next = new URLSearchParams();
       if (pinShell) next.set('shell', store.state.shell);
-      if (store.state.layout !== 'galaxy') next.set('layout', store.state.layout);
       if (store.state.selected >= 0) next.set('card', universe.uuid(store.state.selected));
+
+      let setCode = '';
       if (store.state.filter.sets.size === 1) {
         const idx = [...store.state.filter.sets][0]!;
-        const code = universe.meta.sets[idx]?.code;
-        if (code) next.set('set', code);
+        setCode = universe.meta.sets[idx]?.code ?? '';
+        if (setCode) next.set('set', setCode);
       }
-      const qs = next.toString();
+
+      // `galaxy` is the default and normally left out to keep the URL clean,
+      // but the reader switches to `sets` for a bare `?set=`, so alongside one
+      // it has to be written or reloading the link changes the layout.
+      const mode = store.state.layout;
+      if (mode !== 'galaxy' || setCode) next.set('layout', mode);
+
+      const cards = formatCards(universe, store.state.highlightOracles);
+      const qs = cards ? appendRaw(next.toString(), 'cards', cards) : next.toString();
       const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
       window.history.replaceState(null, '', url);
     }, 250);
@@ -90,6 +178,7 @@ export function connectUrlState(universe: Universe): () => void {
   const offSelected = store.on('selected', write);
   const offLayout = store.on('layout', write);
   const offFilter = store.on('filter', write);
+  const offHighlight = store.on('highlightOracles', write);
   // Only meaningful while the shell is pinned, but subscribing unconditionally
   // is cheaper than branching and the writer already ignores it otherwise.
   const offShell = store.on('shell', write);
@@ -98,7 +187,17 @@ export function connectUrlState(universe: Universe): () => void {
     offSelected();
     offLayout();
     offFilter();
+    offHighlight();
     offShell();
     if (queued) clearTimeout(queued);
   };
+}
+
+/**
+ * Appends an already-encoded value, which `URLSearchParams.toString()` cannot
+ * do: it would re-encode the `%` of every `%2C` and the separators along with
+ * them, undoing exactly the distinction `parseCards` needs.
+ */
+function appendRaw(qs: string, key: string, value: string): string {
+  return qs ? `${qs}&${key}=${value}` : `${key}=${value}`;
 }

@@ -71,7 +71,15 @@ export class App {
   private pointerInside = false;
   private lastPointer = { x: 0, y: 0 };
   /** Camera pose at the last pick, so motion can re-arm one. */
-  private lastPickPose = '';
+  /**
+   * Quantised camera pose at the last camera-driven pick: distance, target,
+   * position. Numbers rather than the formatted string this used to compare —
+   * that built seven `toFixed` calls and a template literal every frame the
+   * pointer was over the canvas, to answer a question that is seven float
+   * comparisons.
+   */
+  private lastPickPose = new Float64Array(7);
+  private poseScratch = new Float64Array(7);
   private frames = 0;
   private fpsAccum = 0;
   private filterQueued = false;
@@ -114,7 +122,7 @@ export class App {
     this.billboards = new CardBillboards(universe, this.starfield, this.mask);
     this.labels = new StarLabels(universe, this.starfield, this.mask);
     this.printingTrail = new PrintingTrail(universe, this.starfield);
-    this.eraMarkers = new EraMarkers(universe);
+    this.eraMarkers = new EraMarkers(this.starfield.ctx);
 
     this.scene.add(this.nebula.compositeMesh);
     this.scene.add(this.starfield.points);
@@ -556,17 +564,15 @@ export class App {
     // under a stationary cursor genuinely changes as you orbit, and this also
     // gives a dropped readback a natural second chance.
     if (this.pointerInside) {
-      const pose = `${this.rig.distance.toFixed(1)}|${this.rig.target.x.toFixed(1)},${this.rig.target.y.toFixed(1)},${this.rig.target.z.toFixed(1)}|${this.camera.position.x.toFixed(1)},${this.camera.position.y.toFixed(1)},${this.camera.position.z.toFixed(1)}`;
-      if (pose !== this.lastPickPose) {
-        // Auto-rotate plus a pointer sitting over the canvas used to re-pick
-        // every frame — a second 117k-vertex pass, scissored or not. Pointer
-        // moves still pick immediately; camera-only picks settle at ~14 Hz.
-        const now = performance.now();
-        if (now - this.lastCameraPick > 100) {
-          this.lastPickPose = pose;
-          this.lastCameraPick = now;
-          this.picker.request(this.lastPointer.x, this.lastPointer.y);
-        }
+      // Auto-rotate plus a pointer sitting over the canvas used to re-pick
+      // every frame — a second 117k-vertex pass, scissored or not. Pointer
+      // moves still pick immediately; camera-only picks settle at ~14 Hz. The
+      // throttle is tested first because it rejects most frames outright.
+      const now = performance.now();
+      if (now - this.lastCameraPick > 100 && this.readPose(this.poseScratch)) {
+        this.lastPickPose.set(this.poseScratch);
+        this.lastCameraPick = now;
+        this.picker.request(this.lastPointer.x, this.lastPointer.y);
       }
     }
 
@@ -611,23 +617,42 @@ export class App {
     });
   }
 
+  /**
+   * Writes the current pose into `out`, quantised to a tenth of a unit, and
+   * returns whether it differs from the pose of the last camera-driven pick.
+   */
+  private readPose(out: Float64Array): boolean {
+    const t = this.rig.target;
+    const p = this.camera.position;
+    out[0] = Math.round(this.rig.distance * 10);
+    out[1] = Math.round(t.x * 10);
+    out[2] = Math.round(t.y * 10);
+    out[3] = Math.round(t.z * 10);
+    out[4] = Math.round(p.x * 10);
+    out[5] = Math.round(p.y * 10);
+    out[6] = Math.round(p.z * 10);
+    for (let i = 0; i < 7; i++) if (out[i] !== this.lastPickPose[i]) return true;
+    return false;
+  }
+
   private updateStats(dt: number): void {
     this.frames++;
     this.fpsAccum += dt;
     if (this.fpsAccum < 0.4) return;
 
-    const window = this.fpsAccum;
-    const fps = Math.round(this.frames / window);
+    // Not `window`: that shadowed the global for the rest of the method.
+    const elapsed = this.fpsAccum;
+    const fps = Math.round(this.frames / elapsed);
     store.set('stats', {
       fps,
       visible: store.state.matchCount,
       total: this.universe.count,
       drawCalls: this.renderer.info.render.calls,
-      ms: +((window / this.frames) * 1000).toFixed(2),
+      ms: +((elapsed / this.frames) * 1000).toFixed(2),
     });
     this.frames = 0;
     this.fpsAccum = 0;
-    this.adaptQuality(fps, window);
+    this.adaptQuality(fps, elapsed);
   }
 
   /**

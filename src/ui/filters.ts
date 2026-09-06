@@ -422,14 +422,21 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
     // `left` and `offsetWidth` are layout pixels, before the UI zoom; the
     // camera works in the CSS pixels the canvas is actually sized in, so the
     // footprint has to be converted or the inset is wrong by the scale factor.
-    const onScreen = (left + width + INSET_GUTTER) * uiScale();
+    const layoutPx = left + width + INSET_GUTTER;
+    const onScreen = layoutPx * uiScale();
     const next = { ...defaultInsets(), left: Math.round(onScreen) };
+
+    // The CSS variable says the same thing, but in the other coordinate space.
+    // Anything that consumes it — `.mcu-layout-switcher`, `.mcu-bookmarks-wrap`
+    // — lives inside the element `scale.ts` puts `zoom` on, so a length written
+    // there is multiplied by the scale before it reaches the screen. Writing
+    // the screen-pixel figure applied that scale twice and left the chrome
+    // ~13px off centre at zoom 0.85. The store keeps screen pixels because the
+    // camera reads it in JS, outside the zoom entirely.
+    root.style.setProperty('--mcu-inset-left', `${Math.round(layoutPx)}px`);
 
     const prev = store.state.insets;
     if (prev.left === next.left) return;
-    // The CSS variable is the same number for anything that has to sit in the
-    // free area — the layout switcher centres on it.
-    root.style.setProperty('--mcu-inset-left', `${next.left}px`);
     store.set('insets', next);
   }
 
