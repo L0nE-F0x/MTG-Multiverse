@@ -13,6 +13,27 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 # ▶ START HERE — next session
 
+**2026-09-06 — second look pass (thread, chrome, lighting).**
+
+On top of the Saved-Views strip and the first trail fix:
+
+- Reprint thread is pulled onto the card's mean ray and corner-smoothed, so a
+  close-up of Sol Ring is a history, not a scribble. Deselect hides it in the
+  same frame. Kin printings no longer grow a cyan ring each — only the opened
+  star does.
+- Clicking the void actually deselects (interaction suite covers it).
+- Settings tips sit in the gap left of the panel, on the whole row, and say
+  what Bloom / Exposure / Nebula actually do.
+- Colour-pie compass uses saturated WUBRG, hides while a card is open, and
+  lives under the card panel in z-order.
+- Card panel reports a right inset. Search, Settings and the layout switcher
+  slide out of its way; the camera recentres on the space that is left.
+- Stars have a tighter core and a faint chromatic spike. Nebula has modest
+  forward scatter from the core and slightly darker dust lanes. Core glow is
+  less of a white blob.
+
+Interaction suite **61/61**.
+
 **2026-09-06 — printing thread, Saved Views, settings tips, minimap, look.**
 
 - The reprint thread no longer comes back after you dismiss a card and switch

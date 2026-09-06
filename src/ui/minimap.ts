@@ -9,15 +9,14 @@ import { store, type LayoutMode } from '../core/store.ts';
 import { COLOR_BIT, type ColorLetter } from '../data/format.ts';
 import { COLOR_ANGLE } from '../layout/layouts.ts';
 import { el, listen } from './dom.ts';
-import { MANA_COLOR_HEX } from './theme.ts';
 import '../styles/minimap.css';
 
-const ARMS: { letter: ColorLetter; label: string }[] = [
-  { letter: 'W', label: 'White' },
-  { letter: 'U', label: 'Blue' },
-  { letter: 'B', label: 'Black' },
-  { letter: 'R', label: 'Red' },
-  { letter: 'G', label: 'Green' },
+const ARMS: { letter: ColorLetter; label: string; fill: string }[] = [
+  { letter: 'W', label: 'White', fill: '#f3e2a0' },
+  { letter: 'U', label: 'Blue', fill: '#4aa8ff' },
+  { letter: 'B', label: 'Black', fill: '#9a6ae8' },
+  { letter: 'R', label: 'Red', fill: '#ff5a3c' },
+  { letter: 'G', label: 'Green', fill: '#3dce74' },
 ];
 
 /** Layouts where colour identity is still a spatial axis. */
@@ -43,28 +42,31 @@ function annular(a0: number, a1: number, r0: number, r1: number): string {
 
 export function mountMinimap(root: HTMLElement): { destroy(): void } {
   const svg = document.createElementNS(svgNS, 'svg');
-  svg.setAttribute('viewBox', '-1.22 -1.22 2.44 2.44');
+  svg.setAttribute('viewBox', '-1.28 -1.28 2.56 2.56');
   svg.setAttribute('aria-hidden', 'true');
 
   const ring = document.createElementNS(svgNS, 'circle');
-  ring.setAttribute('r', '1.02');
+  ring.setAttribute('r', '1.08');
   ring.setAttribute('class', 'mcu-minimap-ring');
   svg.append(ring);
 
-  for (const { letter, label } of ARMS) {
+  for (const { letter, label, fill } of ARMS) {
+    const group = document.createElementNS(svgNS, 'g');
+    group.setAttribute('data-arm', letter);
+    group.setAttribute('data-tip', `Fly to the ${label} arm`);
+    group.setAttribute('aria-label', label);
+    group.style.cursor = 'pointer';
+
     const a0 = COLOR_ANGLE[COLOR_BIT[letter]]! - Math.PI / 5;
     const a1 = COLOR_ANGLE[COLOR_BIT[letter]]! + Math.PI / 5;
     const path = document.createElementNS(svgNS, 'path');
-    path.setAttribute('d', annular(a0, a1, 0.34, 1));
-    path.setAttribute('fill', MANA_COLOR_HEX[letter] ?? '#888');
-    path.setAttribute('data-arm', letter);
-    path.setAttribute('data-tip', `Fly to the ${label} arm`);
-    path.setAttribute('aria-label', label);
-    svg.append(path);
+    path.setAttribute('d', annular(a0, a1, 0.36, 1.0));
+    path.setAttribute('fill', fill);
+    group.append(path);
 
     const mid = COLOR_ANGLE[COLOR_BIT[letter]]!;
-    const tx = Math.cos(mid) * 0.68;
-    const ty = Math.sin(mid) * 0.68;
+    const tx = Math.cos(mid) * 0.70;
+    const ty = Math.sin(mid) * 0.70;
     const text = document.createElementNS(svgNS, 'text');
     text.setAttribute('x', tx.toFixed(3));
     text.setAttribute('y', ty.toFixed(3));
@@ -74,16 +76,17 @@ export function mountMinimap(root: HTMLElement): { destroy(): void } {
     // Counter-rotate so the letters stay upright after the SVG's -90° turn.
     text.setAttribute('transform', `rotate(90 ${tx.toFixed(3)} ${ty.toFixed(3)})`);
     text.textContent = letter;
-    svg.append(text);
+    group.append(text);
+    svg.append(group);
   }
 
   const core = document.createElementNS(svgNS, 'circle');
-  core.setAttribute('r', '0.28');
+  core.setAttribute('r', '0.30');
   core.setAttribute('class', 'mcu-minimap-core');
   svg.append(core);
 
   const needle = document.createElementNS(svgNS, 'polygon');
-  needle.setAttribute('points', '0,-1.14 0.07,-0.96 -0.07,-0.96');
+  needle.setAttribute('points', '0,-1.20 0.085,-0.98 -0.085,-0.98');
   needle.setAttribute('class', 'mcu-minimap-needle');
   svg.append(needle);
 
@@ -110,12 +113,14 @@ export function mountMinimap(root: HTMLElement): { destroy(): void } {
     if (!text) return;
     floatTip.textContent = text;
     floatTip.hidden = false;
-    const r = anchor.getBoundingClientRect();
+    void floatTip.offsetWidth;
+    const r = wrap.getBoundingClientRect();
     const tipR = floatTip.getBoundingClientRect();
-    let left = r.left - tipR.width - 10;
+    let left = r.left - tipR.width - 12;
     if (left < 8) left = r.right + 10;
     let top = r.top + r.height / 2 - tipR.height / 2;
     if (top < 8) top = 8;
+    if (top + tipR.height > window.innerHeight - 8) top = window.innerHeight - tipR.height - 8;
     floatTip.style.left = `${left}px`;
     floatTip.style.top = `${top}px`;
   }
@@ -150,6 +155,10 @@ export function mountMinimap(root: HTMLElement): { destroy(): void } {
   function paintShell(): void {
     const hide = store.state.shell !== 'play' || store.state.selected >= 0;
     wrap.classList.toggle('mcu-minimap--hidden', hide);
+    if (hide) {
+      floatTip.hidden = true;
+      tipAnchor = null;
+    }
   }
 
   paintHeading();

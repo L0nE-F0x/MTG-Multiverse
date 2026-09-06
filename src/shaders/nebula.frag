@@ -95,12 +95,12 @@ float galaxyDensity(vec3 p, out vec3 tint) {
   float r = length(p.xz);
   float phase = armPhase(p);
   tint = pieColor(phase);
-  float arm = pow(0.5 + 0.5 * cos(ARM_COUNT * phase), 5.2);
+  float arm = pow(0.5 + 0.5 * cos(ARM_COUNT * phase), 6.1);
   float disc  = smoothstep(R_OUT, R_OUT * 0.42, r);
   float bulge = exp(-r * r / (2.0 * 50.0 * 50.0));
   float h     = 16.0 + 0.07 * r;
   float vert  = exp(-(p.y * p.y) / (2.0 * h * h));
-  float base = (arm * 0.982 + 0.018) * disc * vert + bulge * vert * 0.85;
+  float base = (arm * 0.988 + 0.012) * disc * vert + bulge * vert * 0.78;
   return base * filament(p);
 }
 
@@ -235,10 +235,20 @@ void main() {
           vec3 emit = tint * (0.55 + 0.45 * exp(-rr / 160.0));
           // Nucleus white is galaxy-sized, not layout-sized — scaling it with
           // the bounding sphere turned Sets into a white fog bank.
-          float coreW = uLayout < 0.5 || uLayout > 4.5 ? 1.55 : 0.15;
+          float coreW = uLayout < 0.5 || uLayout > 4.5 ? 1.35 : 0.15;
           emit += vec3(1.0, 0.87, 0.76) * exp(-rr / 60.0) * coreW;
+          // Henyey-Greenstein, g>0 = forward scatter. Light travels out from
+          // the core; looking along that direction (core behind the gas)
+          // brightens, looking into the core darkens the dust a little. That
+          // is what makes the volume feel lit rather than a flat tint.
+          vec3 lightDir = p / max(rr, 1e-3);
+          float mu = clamp(dot(rd, lightDir), -1.0, 1.0);
+          float g = 0.38;
+          float g2 = g * g;
+          float phase = (1.0 - g2) / pow(1.0 + g2 - 2.0 * g * mu, 1.5);
+          emit *= 0.62 + 0.38 * phase;
           accum += transmittance * emit * sigma;
-          transmittance *= exp(-sigma * 1.75);
+          transmittance *= exp(-sigma * 1.85);
         }
         t += dt;
       }

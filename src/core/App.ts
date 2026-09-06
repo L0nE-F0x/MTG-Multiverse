@@ -505,15 +505,19 @@ export class App {
   /**
    * Canvas size in CSS pixels, and the slice of it the UI is not covering.
    */
-  private viewport(): { cssW: number; cssH: number; freeW: number; insetLeft: number } {
+  private viewport(): { cssW: number; cssH: number; freeW: number; offsetX: number } {
     const cssW = Math.max(1, this.canvas.clientWidth || window.innerWidth);
     const cssH = Math.max(1, this.canvas.clientHeight || window.innerHeight);
     const { left, right } = store.state.insets;
     // Never let a panel claim so much that the remaining strip is unusable —
     // a mis-measured inset should degrade the framing, not erase the view.
     const insetLeft = Math.min(left, cssW * 0.5);
-    const freeW = Math.max(1, cssW - insetLeft - Math.min(right, cssW * 0.25));
-    return { cssW, cssH, freeW, insetLeft };
+    const insetRight = Math.min(right, cssW * 0.45);
+    const freeW = Math.max(1, cssW - insetLeft - insetRight);
+    // Negative offsetX shifts the frustum left, which puts the content right
+    // — so (left - right)/2 centres the layout in the remaining rectangle.
+    const offsetX = -(insetLeft - insetRight) / 2;
+    return { cssW, cssH, freeW, offsetX };
   }
 
   /** Distance that fits the layout into the space the UI leaves. */
@@ -523,7 +527,7 @@ export class App {
   }
 
   private resize(): void {
-    const { cssW, cssH, insetLeft } = this.viewport();
+    const { cssW, cssH, offsetX } = this.viewport();
     // Host webviews (Tauri) often sit on a retina panel and an iGPU at once.
     // Capping DPR there cuts fill-rate without touching the public site.
     const dprCap = isEmbedded() ? 1.25 : 2;
@@ -547,10 +551,11 @@ export class App {
      *
      * A negative offsetX shifts the frustum left, which puts the content
      * right. Width and height match the full size, so this is a pure shift
-     * with no change of scale.
+     * with no change of scale. Both side panels count, so a card-detail
+     * column on the right pulls the other way.
      */
-    if (insetLeft > 0.5) {
-      this.camera.setViewOffset(cssW, cssH, -insetLeft / 2, 0, cssW, cssH);
+    if (Math.abs(offsetX) > 0.5) {
+      this.camera.setViewOffset(cssW, cssH, offsetX, 0, cssW, cssH);
     } else {
       this.camera.clearViewOffset();
     }

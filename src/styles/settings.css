@@ -3,7 +3,7 @@
 .mcu-settings-toggle {
   position: fixed;
   top: 20px;
-  right: 20px;
+  right: calc(20px + var(--mcu-inset-right, 0px));
   z-index: 25;
   background: var(--mcu-panel-bg);
   backdrop-filter: blur(20px);
@@ -27,7 +27,7 @@
 .mcu-settings {
   position: fixed;
   top: 66px;
-  right: 20px;
+  right: calc(20px + var(--mcu-inset-right, 0px));
   /* Above the title screen (z 90) so Settings from the landing is reachable. */
   z-index: 96;
   width: 260px;
@@ -110,7 +110,7 @@
   color: var(--mcu-cyan);
   border-color: var(--mcu-border-strong);
 }
-.mcu-settings-label[data-tip],
+.mcu-settings-row[data-tip],
 .mcu-settings-checkbox-row[data-tip],
 .mcu-settings-reset[data-tip] {
   cursor: help;
@@ -134,7 +134,7 @@
 @media (max-width: 900px) {
   .mcu-settings-toggle {
     top: 10px;
-    right: 10px;
+    right: calc(10px + var(--mcu-inset-right, 0px));
     padding: 7px 12px;
     font-size: 9px;
     min-height: var(--mcu-touch);
@@ -147,7 +147,7 @@
   .mcu-settings {
     top: var(--mcu-mobile-panel-top);
     bottom: var(--mcu-mobile-panel-bottom);
-    right: 10px;
+    right: calc(10px + var(--mcu-inset-right, 0px));
     width: 82vw;
     max-width: 320px;
     max-height: none;

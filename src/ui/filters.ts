@@ -3,7 +3,7 @@
  * `store.patchFilter` (or, for reset, `store.set('filter', ...)`) and reads
  * back `store.state.filter` to stay in sync with external changes.
  */
-import { defaultFilter, defaultInsets, store } from '../core/store.ts';
+import { defaultFilter, store } from '../core/store.ts';
 import type { ColorMatch } from '../core/store.ts';
 import { COLOR_LETTERS, releaseDayToYear } from '../data/format.ts';
 import type { ColorLetter, FormatName, TypeName } from '../data/format.ts';
@@ -458,7 +458,6 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
     // footprint has to be converted or the inset is wrong by the scale factor.
     const layoutPx = left + width + INSET_GUTTER;
     const onScreen = layoutPx * uiScale();
-    const next = { ...defaultInsets(), left: Math.round(onScreen) };
 
     // The CSS variable says the same thing, but in the other coordinate space.
     // Anything that consumes it — `.mcu-layout-switcher`
@@ -469,9 +468,7 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
     // camera reads it in JS, outside the zoom entirely.
     root.style.setProperty('--mcu-inset-left', `${Math.round(layoutPx)}px`);
 
-    const prev = store.state.insets;
-    if (prev.left === next.left) return;
-    store.set('insets', next);
+    store.patchInsets({ left: Math.round(onScreen) });
   }
 
   function setOpen(open: boolean): void {
@@ -551,7 +548,7 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
       offSetSearch();
       offResize();
       root.style.removeProperty('--mcu-inset-left');
-      store.set('insets', defaultInsets());
+      store.patchInsets({ left: 0 });
       offTipOver();
       offTipOut();
       yearSlider.destroy();

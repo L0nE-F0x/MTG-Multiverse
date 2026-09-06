@@ -3,12 +3,12 @@
 .mcu-search {
   position: fixed;
   top: 20px;
-  right: 130px;
+  right: calc(130px + var(--mcu-inset-right, 0px));
   width: 220px;
   pointer-events: auto;
   z-index: 30;
   animation: mcu-panel-in 500ms var(--mcu-ease) both;
-  transition: width 240ms var(--mcu-ease);
+  transition: width 240ms var(--mcu-ease), right 460ms var(--mcu-ease);
 }
 .mcu-search:focus-within,
 .mcu-search--open {

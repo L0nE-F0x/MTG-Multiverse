@@ -276,6 +276,28 @@ try {
   check('card panel opens', selected.panelOpen);
   check('card panel is actually within the viewport', selected.panelOnScreen);
 
+  const miniWhileOpen = await page.evaluate(() =>
+    document.querySelector('.mcu-minimap')?.classList.contains('mcu-minimap--hidden') === true);
+  check('colour-pie compass hides while the card panel is open', miniWhileOpen);
+
+  // Click the void just to the right of the filter panel — dense close-ups
+  // still have empty sky there, and a miss has to actually deselect.
+  const voidClick = await page.evaluate(() => {
+    const canvas = document.querySelector('canvas');
+    const r = canvas.getBoundingClientRect();
+    const left = window.__mcu.store.state.insets.left;
+    return { x: Math.round(r.left + left + 48), y: Math.round(r.top + r.height * 0.42) };
+  });
+  await page.mouse.click(voidClick.x, voidClick.y);
+  await sleep(450);
+  const afterVoid = await page.evaluate(() => window.__mcu.store.state.selected);
+  check('clicking empty space deselects the card', afterVoid === -1,
+    afterVoid === -1 ? '' : `still selected ${afterVoid}`);
+
+  const miniAfterClose = await page.evaluate(() =>
+    document.querySelector('.mcu-minimap')?.classList.contains('mcu-minimap--hidden') === false);
+  check('colour-pie compass returns after deselect', miniAfterClose);
+
   // --- drag must not select ------------------------------------------------
   await page.evaluate(() => window.__mcu.store.set('selected', -1));
   await sleep(400);
@@ -537,6 +559,13 @@ try {
   await sleep(500);
   const trailStay = await page.evaluate(() => window.__mcu.app.printingTrail.line.visible);
   check('a dismissed thread does not return on a layout switch', trailStay === false);
+
+  const bloomTip = await page.evaluate(() => {
+    const row = [...document.querySelectorAll('.mcu-settings-row')]
+      .find((el) => (el.textContent || '').includes('Bloom'));
+    return row?.getAttribute('data-tip') ?? '';
+  });
+  check('Bloom slider explains itself on hover', /glow|halo/i.test(bloomTip), bloomTip || 'missing data-tip');
 
   // --- the embed message channel ---------------------------------------------
   // The host drives highlighting over postMessage. Nothing else in the suite

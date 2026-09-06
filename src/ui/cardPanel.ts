@@ -8,6 +8,7 @@ import { store } from '../core/store.ts';
 import { FORMAT_BIT } from '../data/format.ts';
 import type { Universe } from '../data/universe.ts';
 import { capitalize, el, fmtInt, listen } from './dom.ts';
+import { uiScale } from './scale.ts';
 import { MANA_COLOR_HEX } from './theme.ts';
 import '../styles/cardPanel.css';
 
@@ -160,6 +161,8 @@ async function fetchScryfall(universe: Universe, i: number, onData: (c: Scryfall
   }
 }
 
+const CARD_INSET_GUTTER = 16;
+
 export function mountCardPanel(root: HTMLElement, universe: Universe): CardPanelHandle {
   const panel = el('aside', {
     className: 'mcu-card-panel mcu-glass-panel',
@@ -168,6 +171,16 @@ export function mountCardPanel(root: HTMLElement, universe: Universe): CardPanel
   root.append(panel);
 
   let cleanupTilt: (() => void) | null = null;
+
+  function reportInset(open: boolean): void {
+    // Same coordinate split as the filter panel: CSS vars are layout pixels
+    // (inside `zoom`), the store is screen pixels (the camera).
+    const width = panel.offsetWidth || 340;
+    const right = parseFloat(getComputedStyle(panel).right) || 20;
+    const layoutPx = open ? width + right + CARD_INSET_GUTTER : 0;
+    root.style.setProperty('--mcu-inset-right', `${Math.round(layoutPx)}px`);
+    store.patchInsets({ right: Math.round(layoutPx * uiScale()) });
+  }
 
   function close(): void {
     store.set('selected', -1);
@@ -180,9 +193,11 @@ export function mountCardPanel(root: HTMLElement, universe: Universe): CardPanel
     panel.innerHTML = '';
     if (i < 0) {
       panel.classList.remove('mcu-card-panel--open');
+      reportInset(false);
       return;
     }
     panel.classList.add('mcu-card-panel--open');
+    reportInset(true);
 
     const closeBtn = el('button', {
       className: 'mcu-card-close',
@@ -272,17 +287,24 @@ export function mountCardPanel(root: HTMLElement, universe: Universe): CardPanel
   }
 
   if (store.state.selected >= 0) render(store.state.selected);
+  else reportInset(false);
   const offSelected = store.on('selected', render);
   const offEscape = listen(window, 'keydown', (e) => {
     if ((e as KeyboardEvent).key === 'Escape' && store.state.selected >= 0) close();
   });
+  const offResize = listen(window, 'resize', () =>
+    reportInset(panel.classList.contains('mcu-card-panel--open')),
+  );
 
   return {
     destroy() {
       offSelected();
       offEscape();
+      offResize();
       cleanupTilt?.();
       inFlight?.abort();
+      root.style.removeProperty('--mcu-inset-right');
+      store.patchInsets({ right: 0 });
       panel.remove();
     },
   };

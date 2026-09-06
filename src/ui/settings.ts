@@ -46,8 +46,9 @@ export function mountSettings(root: HTMLElement): SettingsHandle {
       }),
     );
     const name = el('span', { className: 'mcu-settings-label', text: label });
-    name.setAttribute('data-tip', tip);
-    return el('label', { className: 'mcu-settings-row' }, [name, input, value]);
+    const row = el('label', { className: 'mcu-settings-row' }, [name, input, value]);
+    row.setAttribute('data-tip', tip);
+    return row;
   }
 
   function checkbox(label: string, tip: string, get: () => boolean, set: (v: boolean) => void): HTMLElement {
@@ -89,7 +90,7 @@ export function mountSettings(root: HTMLElement): SettingsHandle {
     el('h3', { className: 'mcu-filter-heading', text: 'Rendering' }),
     slider(
       'Bloom',
-      'How far bright stars glow. Higher values give a hazy halo; too high washes the nebula to white.',
+      'Soft glow around bright stars. Higher values give a dreamy halo; too high washes the nebula to white.',
       0, 3, 0.05,
       () => store.state.visual.bloom, (v) => store.patchVisual({ bloom: v }),
     ),
@@ -101,13 +102,13 @@ export function mountSettings(root: HTMLElement): SettingsHandle {
     ),
     slider(
       'Star size',
-      'Sprite scale for every star. Bigger is easier to pick; too big turns the disc into a sheet.',
+      'How large each card-star is drawn. Bigger is easier to click; too big turns the disc into a sheet.',
       0, 3, 0.05,
       () => store.state.visual.starSize, (v) => store.patchVisual({ starSize: v }),
     ),
     slider(
       'Nebula intensity',
-      'How strongly the volumetric gas glows. Independent of Exposure — this is the cloud, not the stars.',
+      'How strongly the coloured gas glows. Independent of Exposure — this is the cloud, not the stars.',
       0, 2, 0.05,
       () => store.state.visual.nebula, (v) => store.patchVisual({ nebula: v }),
     ),
@@ -180,16 +181,18 @@ export function mountSettings(root: HTMLElement): SettingsHandle {
     if (!text) return;
     floatTip.textContent = text;
     floatTip.hidden = false;
-    void floatTip.offsetWidth;
+    const panelR = panel.getBoundingClientRect();
     const r = anchor.getBoundingClientRect();
+    // Anchor to the panel's left edge so the box grows away from the sliders
+    // even on the first frame, when its width has not been measured yet.
+    floatTip.style.left = 'auto';
+    floatTip.style.right = `${Math.max(8, window.innerWidth - panelR.left + 12)}px`;
+    let top = r.top + r.height / 2 - 28;
+    void floatTip.offsetWidth;
     const tipR = floatTip.getBoundingClientRect();
-    // Panel lives on the right; prefer the gap to its left.
-    let left = r.left - tipR.width - 12;
-    if (left < 8) left = Math.min(window.innerWidth - tipR.width - 8, r.right + 10);
-    let top = r.top + r.height / 2 - tipR.height / 2;
+    top = r.top + r.height / 2 - tipR.height / 2;
     if (top < 8) top = 8;
     if (top + tipR.height > window.innerHeight - 8) top = window.innerHeight - tipR.height - 8;
-    floatTip.style.left = `${left}px`;
     floatTip.style.top = `${top}px`;
   }
   disposers.push(

@@ -151,8 +151,8 @@ export function createPostChain(
     intensity: 1.12,
     // 0.12 bloomed the nebula into a white sheet; 0.42 left the stars looking
     // dry. This is the gap where cores glow and the gas keeps its colour.
-    luminanceThreshold: 0.32,
-    luminanceSmoothing: 0.24,
+    luminanceThreshold: 0.36,
+    luminanceSmoothing: 0.22,
     mipmapBlur: true,
     radius: 0.80,
     kernelSize: KernelSize.HUGE,

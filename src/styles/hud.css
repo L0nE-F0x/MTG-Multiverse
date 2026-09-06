@@ -97,11 +97,11 @@
    * this bar on top of the panel, and it wins the z-order, so the panel's
    * lower half was simply buried.
    */
-  left: calc(50% + var(--mcu-inset-left, 0px) / 2);
+  left: calc(50% + var(--mcu-inset-left, 0px) / 2 - var(--mcu-inset-right, 0px) / 2);
   translate: -50% 0;
   z-index: 25;
   /* Never grow back over the panel on a narrow window. */
-  max-width: calc(100vw - var(--mcu-inset-left, 0px) - 40px);
+  max-width: calc(100vw - var(--mcu-inset-left, 0px) - var(--mcu-inset-right, 0px) - 40px);
 }
 .mcu-layout-switcher-inner {
   display: flex;
@@ -185,7 +185,7 @@
      (see .mcu-layout-btn below), so the row compresses to fit instead of
      spilling to a second line — wrapping the row itself let each button
      re-expand to its unwrapped single-line width and defeated that. */
-  .mcu-layout-segmented { max-width: calc(100vw - var(--mcu-inset-left, 0px) - 20px); }
+  .mcu-layout-segmented { max-width: calc(100vw - var(--mcu-inset-left, 0px) - var(--mcu-inset-right, 0px) - 20px); }
   .mcu-layout-btn {
     padding: 6px 6px;
     font-size: 9px;
@@ -198,5 +198,5 @@
     justify-content: center;
     text-align: center;
   }
-  .mcu-layout-switcher { bottom: 10px; max-width: calc(100vw - var(--mcu-inset-left, 0px) - 20px); }
+  .mcu-layout-switcher { bottom: 10px; max-width: calc(100vw - var(--mcu-inset-left, 0px) - var(--mcu-inset-right, 0px) - 20px); }
 }

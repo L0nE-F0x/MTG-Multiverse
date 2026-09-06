@@ -233,6 +233,19 @@ class Store {
     this.touch('visual');
   }
 
+  /** Merge a panel's footprint without clobbering the other panels'. */
+  patchInsets(patch: Partial<ViewInsets>): void {
+    const prev = this.state.insets;
+    const next = { ...prev, ...patch };
+    if (
+      next.left === prev.left &&
+      next.right === prev.right &&
+      next.top === prev.top &&
+      next.bottom === prev.bottom
+    ) return;
+    this.set('insets', next);
+  }
+
   private queueFlush(): void {
     if (this.flushQueued) return;
     this.flushQueued = true;

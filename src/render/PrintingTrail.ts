@@ -17,26 +17,26 @@ import type { Starfield } from './Starfield.ts';
  * eras that reprinted it. A card printed once is a dot; Sol Ring is a thread
  * from Alpha to the rim.
  *
- * That premise very nearly failed for the cards it matters most for. The most
- * heavily reprinted cards are disproportionately colourless artifacts — Sol
- * Ring, Arcane Signet, Command Tower — and colourless cards have no arm, so
- * they were being scattered around the full circle by a hash of the row index.
- * Sol Ring's 133 printings drew a scribble across the entire galaxy. The halo
- * angle in `layouts.ts` is now keyed to `oracleIdx` rather than the printing,
- * which gives a colourless card one direction of its own and makes this read.
+ * Colourless artifacts still have thickness — gauss jitter in Y — so a raw
+ * polyline through 64 Sol Rings is a scribble up and down the column. The
+ * line is pulled toward the card's mean ray and then corner-smoothed, which
+ * keeps it visiting the stars without the zigzag.
  *
  * Only ever drawn for the selected card, so it costs nothing until asked for
  * and cannot clutter the general view.
  */
 
 /** Sol Ring has around a hundred printings; past this the line is just noise. */
-const MAX_POINTS = 64;
-const FADE_SECONDS = 0.5;
+const MAX_POINTS = 48;
+const FADE_SECONDS = 0.28;
+/** How far to pull each vertex toward the card's mean ray (0 = raw, 1 = collinear). */
+const SPINE_BLEND = 0.46;
 
 export class PrintingTrail {
   readonly line: Line2;
 
   private readonly positions: Float32Array;
+  private readonly smoothed: Float32Array;
   private readonly geometry: LineGeometry;
   private readonly material: LineMaterial;
   private readonly tmp = new THREE.Vector3();
@@ -54,13 +54,14 @@ export class PrintingTrail {
     private readonly starfield: Starfield,
   ) {
     this.positions = new Float32Array(MAX_POINTS * 3);
+    this.smoothed = new Float32Array(MAX_POINTS * 3);
 
     this.geometry = new LineGeometry();
     this.geometry.setPositions(Array.from(this.positions));
 
     this.material = new LineMaterial({
       color: 0xffffff,
-      linewidth: 2.8,
+      linewidth: 1.85,
       transparent: true,
       opacity: 0,
       depthTest: false,
@@ -106,6 +107,8 @@ export class PrintingTrail {
       this.card = -1;
       this.points = [];
       this.targetOpacity = 0;
+      this.opacity = 0;
+      this.line.visible = false;
       return;
     }
     this.card = card;
@@ -115,6 +118,8 @@ export class PrintingTrail {
       // A single printing has no history to draw.
       this.points = [];
       this.targetOpacity = 0;
+      this.opacity = 0;
+      this.line.visible = false;
       return;
     }
 
@@ -127,9 +132,9 @@ export class PrintingTrail {
     // Lifted well above 1: this is additive over a bright field, and the post
     // chain's ACES curve pulls anything subtler back down to invisible.
     this.material.color.setRGB(
-      Math.min(1, rgb[0] * 1.35 + 0.15),
-      Math.min(1, rgb[1] * 1.35 + 0.15),
-      Math.min(1, rgb[2] * 1.35 + 0.15),
+      Math.min(1, rgb[0] * 1.25 + 0.22),
+      Math.min(1, rgb[1] * 1.25 + 0.22),
+      Math.min(1, rgb[2] * 1.25 + 0.22),
     );
 
     this.targetOpacity = this.layoutSupported ? 1 : 0;
@@ -138,25 +143,59 @@ export class PrintingTrail {
   update(dt: number): void {
     // Drop faster than it appears, so dismissing a card does not leave a ghost
     // hanging over the next layout.
-    const tau = this.targetOpacity < this.opacity ? FADE_SECONDS * 0.4 : FADE_SECONDS;
-    const k = 1 - Math.exp(-dt / (tau / 4));
+    const tau = this.targetOpacity < this.opacity ? FADE_SECONDS * 0.35 : FADE_SECONDS;
+    const k = 1 - Math.exp(-dt / Math.max(tau / 4, 0.02));
     this.opacity += (this.targetOpacity - this.opacity) * k;
-    this.material.opacity = this.opacity * 0.92;
+    this.material.opacity = this.opacity * 0.78;
 
-    const showing = this.opacity > 0.01 && this.points.length >= 2;
+    const showing = this.opacity > 0.01 && this.card >= 0 && this.points.length >= 2;
     this.line.visible = showing;
     if (!showing) return;
 
     // Re-read every frame so the thread follows a layout morph rather than
     // hanging in the positions the cards used to occupy.
     const n = this.points.length;
+    let mx = 0;
+    let mz = 0;
     for (let i = 0; i < n; i++) {
       this.starfield.positionOf(this.points[i]!, this.tmp);
       this.positions[i * 3] = this.tmp.x;
       this.positions[i * 3 + 1] = this.tmp.y;
       this.positions[i * 3 + 2] = this.tmp.z;
+      mx += this.tmp.x;
+      mz += this.tmp.z;
     }
-    // LineGeometry expects a packed xyz array of the used points only.
+    const meanLen = Math.hypot(mx, mz) || 1;
+    mx /= meanLen;
+    mz /= meanLen;
+
+    for (let i = 0; i < n; i++) {
+      const x = this.positions[i * 3]!;
+      const y = this.positions[i * 3 + 1]!;
+      const z = this.positions[i * 3 + 2]!;
+      const r = Math.hypot(x, z);
+      this.smoothed[i * 3] = x + (mx * r - x) * SPINE_BLEND;
+      this.smoothed[i * 3 + 1] = y;
+      this.smoothed[i * 3 + 2] = z + (mz * r - z) * SPINE_BLEND;
+    }
+    // Three-point average on Y unkinks the vertical jitter without flattening
+    // the disc. Ends stay put so the thread still meets the first and last star.
+    for (let i = 1; i < n - 1; i++) {
+      const y0 = this.smoothed[(i - 1) * 3 + 1]!;
+      const y1 = this.smoothed[i * 3 + 1]!;
+      const y2 = this.smoothed[(i + 1) * 3 + 1]!;
+      this.positions[i * 3] = this.smoothed[i * 3]!;
+      this.positions[i * 3 + 1] = y0 * 0.25 + y1 * 0.5 + y2 * 0.25;
+      this.positions[i * 3 + 2] = this.smoothed[i * 3 + 2]!;
+    }
+    this.positions[0] = this.smoothed[0]!;
+    this.positions[1] = this.smoothed[1]!;
+    this.positions[2] = this.smoothed[2]!;
+    const last = (n - 1) * 3;
+    this.positions[last] = this.smoothed[last]!;
+    this.positions[last + 1] = this.smoothed[last + 1]!;
+    this.positions[last + 2] = this.smoothed[last + 2]!;
+
     const packed = n === MAX_POINTS ? this.positions : this.positions.subarray(0, n * 3);
     this.geometry.setPositions(Array.from(packed));
     this.line.computeLineDistances();
@@ -173,6 +212,6 @@ function thin(list: number[], max: number): number[] {
   if (list.length <= max) return list;
   const out: number[] = [];
   const step = (list.length - 1) / (max - 1);
-  for (let i = 0; i < max; i++) out.push(list[Math.round(i * step)]);
+  for (let i = 0; i < max; i++) out.push(list[Math.round(i * step)]!);
   return out;
 }

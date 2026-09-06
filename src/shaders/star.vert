@@ -34,6 +34,7 @@ varying vec3  vColor;
 varying float vBright;
 varying float vSpike;
 varying float vHighlight;
+varying float vKin;
 
 void main() {
   // Straight lerp between layouts would slide every star through the origin at
@@ -86,9 +87,14 @@ void main() {
   float selected = step(abs(aIndex - uSelected), 0.5);
   float kinHover = step(abs(aOracle - uHoverOracle), 0.5) * step(0.0, uHoverOracle);
   float kinSel   = step(abs(aOracle - uSelectedOracle), 0.5) * step(0.0, uSelectedOracle);
-  vHighlight = max(max(hovered * 0.6, selected), max(kinHover * 0.45, kinSel * 0.7));
-  clamped *= 1.0 + vHighlight * 2.2;
-  bright *= 1.0 + vHighlight * 2.0;
+  // The cyan ring is only for the star under the cursor / the opened card.
+  // Sol Ring has ~130 printings: putting the ring on every one of them filled
+  // the close-up with a cloud of halos and the printing thread disappeared
+  // underneath. Kin still lift in size and brightness, just without the ring.
+  vHighlight = max(hovered * 0.7, selected);
+  vKin = max(kinHover * 0.55, kinSel) * (1.0 - vHighlight);
+  clamped *= 1.0 + vHighlight * 1.85 + vKin * 0.22;
+  bright *= 1.0 + vHighlight * 1.65 + vKin * 0.55;
 
   // Deck / collection lift. Kept off vHighlight so a hundred-card list does
   // not grow a cyan ring on every printing — that path is for hover/select.

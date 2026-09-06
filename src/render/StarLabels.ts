@@ -306,11 +306,14 @@ export class StarLabels {
     // A dark outline rather than a filled plate: over a starfield a solid
     // background reads as a hole punched in the galaxy.
     ctx.lineJoin = 'round';
-    ctx.strokeStyle = 'rgba(2, 4, 10, 0.95)';
-    ctx.lineWidth = 10;
+    ctx.strokeStyle = 'rgba(2, 4, 10, 0.92)';
+    ctx.lineWidth = 12;
+    ctx.strokeText(name, cxp, cyp);
+    ctx.strokeStyle = 'rgba(2, 4, 10, 0.55)';
+    ctx.lineWidth = 18;
     ctx.strokeText(name, cxp, cyp);
 
-    ctx.fillStyle = 'rgba(236, 246, 255, 0.99)';
+    ctx.fillStyle = 'rgba(244, 250, 255, 0.98)';
     ctx.fillText(name, cxp, cyp);
 
     slot.texture.needsUpdate = true;

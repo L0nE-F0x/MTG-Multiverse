@@ -34,9 +34,9 @@ export class CoreGlow {
     this.texture = radialTexture(256);
 
     const specs = [
-      { scale: 210, opacity: 0.30, color: 0xffe6b8, spin: 0.020 },
-      { scale: 120, opacity: 0.34, color: 0xfff1d4, spin: -0.031 },
-      { scale: 54, opacity: 0.42, color: 0xffffff, spin: 0.047 },
+      { scale: 186, opacity: 0.22, color: 0xffe6b8, spin: 0.020 },
+      { scale: 108, opacity: 0.30, color: 0xfff1d4, spin: -0.031 },
+      { scale: 48, opacity: 0.40, color: 0xffffff, spin: 0.047 },
     ];
 
     for (const spec of specs) {
