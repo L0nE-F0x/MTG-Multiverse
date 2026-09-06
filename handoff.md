@@ -23,8 +23,8 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 - The newest set pulses on the rim for a few seconds after you enter, then
   matches every other star.
 
-Ships with the second look pass in FND **v3.7.4** (Windows updater + Linux
-tarball; macOS dmg waits on CI). Interaction suite **67/67**.
+Ships with the second look pass in FND **v3.7.4** (Windows updater, Linux
+tarball, macOS dmg rolled). Interaction suite **67/67**.
 
 **2026-09-06 — second look pass (thread, chrome, lighting).**
 
