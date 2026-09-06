@@ -13,6 +13,15 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 # ▶ START HERE — next session
 
+**2026-09-06 night — session closed. Nothing in flight.**
+
+FND **v3.7.4** is on Windows, macOS and Linux. Aetherfield live has the look
+pass (reprint thread, settings tips, colour pie, arm flights, focus dim, era
+ticks, newest-set pulse). Interaction suite **67/67**.
+
+Open: AUR `filthy-net-deck-bin` still waits on Arch registration. No other
+todo.
+
 **2026-09-06 — arm flights, focus dim, era ticks, newest-set pulse.**
 
 - Colour-pie click is a 2s swoop along the arm, not a heading snap.
