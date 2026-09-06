@@ -138,6 +138,8 @@ export class Starfield {
         uHoverOracle: { value: -1 },
         uSelectedOracle: { value: -1 },
         uNewestSet: { value: newestSetIndex(universe) },
+        uFresh: { value: 0 },
+        uFocus: { value: 0 },
         uFormatBit: { value: 0 },
         uHighlightOn: { value: 0 },
       },

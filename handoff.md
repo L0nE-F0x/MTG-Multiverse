@@ -13,6 +13,18 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 # ▶ START HERE — next session
 
+**2026-09-06 — arm flights, focus dim, era ticks, newest-set pulse.**
+
+- Colour-pie click is a 2s swoop along the arm, not a heading snap.
+- Selecting a card dims everything that is not that card (or a printing of
+  it); other billboards leave. The reprint thread is the thing that reads.
+- Era rings + Alpha / Revised / Modern / current-year labels are sized for
+  the framed view and sit on one spoke as ticks.
+- The newest set pulses on the rim for a few seconds after you enter, then
+  matches every other star.
+
+Ships with the second look pass in FND **v3.7.4**. Interaction suite **67/67**.
+
 **2026-09-06 — second look pass (thread, chrome, lighting).**
 
 On top of the Saved-Views strip and the first trail fix:

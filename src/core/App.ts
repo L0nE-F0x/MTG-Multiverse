@@ -95,6 +95,12 @@ export class App {
   private targetWorldScale = 1;
   /** Last time a camera-driven pick was queued. Pointer moves stay immediate. */
   private lastCameraPick = 0;
+  /** 1 while a card is selected; eased onto the star material as uFocus. */
+  private focus = 0;
+  private targetFocus = 0;
+  /** Newest-set rim pulse. 1 on first entry to play, decays to 0. */
+  private fresh = 0;
+  private freshArmed = true;
 
   constructor(canvas: HTMLCanvasElement, universe: Universe, options: AppOptions = {}) {
     this.canvas = canvas;
@@ -162,6 +168,7 @@ export class App {
     this.applyVisual(store.state.visual);
     this.applyFilter();
     this.applyHighlight();
+    if (store.state.shell === 'play') this.armFreshPulse();
   }
 
   /** Current quality tier, 0 (cheapest) to TOP_TIER. Diagnostics only. */
@@ -318,6 +325,7 @@ export class App {
           this.rig.playCinematic(this.framedDistance(), this.starfield.framePhi(), 45);
           store.set('cinematic', true);
         }
+        if (mode === 'play') this.armFreshPulse();
         if (mode === 'title') {
           this.rig.skipCinematic();
           store.set('cinematic', false);
@@ -423,6 +431,9 @@ export class App {
     if (store.state.highlightOracles.size > 0 && store.state.filter.oracles.size === 0) {
       populated *= 0.4;
     }
+    // A selected card's thread has to win the additive field. The gas stays,
+    // just quieter, so the rest of Magic is still the context.
+    if (store.state.selected >= 0) populated *= 0.42;
 
     this.nebula.setDensity(layout * populated);
     this.coreGlow.setStrength(core * populated);
@@ -481,8 +492,7 @@ export class App {
       store.set('cinematic', true);
     } else if (cue.kind === 'arm') {
       const world = COLOR_ANGLE[COLOR_BIT[cue.color]] ?? 0;
-      this.rig.setAngles(Math.PI / 2 - world, this.starfield.framePhi());
-      this.rig.frame(this.framedDistance());
+      this.rig.playArmFlight(world, this.framedDistance(), this.starfield.framePhi());
     }
     store.set('cameraCue', null);
   }
@@ -490,6 +500,8 @@ export class App {
   private applySelection(i: number): void {
     this.starfield.material.uniforms.uSelected.value = i;
     this.printingTrail.setCard(i);
+    this.targetFocus = i >= 0 ? 1 : 0;
+    this.applyNebulaDensity();
     if (i < 0) {
       this.starfield.setSelectedOracle(-1);
       return;
@@ -500,6 +512,13 @@ export class App {
     // far rim actually takes you there rather than nudging the pivot.
     // Damping 1.45 is a long, readable flight — search "flies you there".
     this.rig.flyTo(this.tmpVec, Math.min(this.rig.distance, 120), 1.45);
+  }
+
+  private armFreshPulse(): void {
+    if (!this.freshArmed) return;
+    this.freshArmed = false;
+    this.fresh = 1;
+    this.starfield.material.uniforms.uFresh.value = 1;
   }
 
   /**
@@ -581,6 +600,12 @@ export class App {
       store.set('viewHeading', heading);
     }
     this.starfield.update(dt, time);
+    this.focus += (this.targetFocus - this.focus) * (1 - Math.exp(-dt * 4.2));
+    this.starfield.material.uniforms.uFocus.value = this.focus;
+    if (this.fresh > 0) {
+      this.fresh = Math.max(0, this.fresh - dt / 11);
+      this.starfield.material.uniforms.uFresh.value = this.fresh;
+    }
     this.worldScale += (this.targetWorldScale - this.worldScale) * (1 - Math.exp(-dt * 2.2));
     this.nebula.setWorldScale(this.worldScale);
     this.coreGlow.setWorldScale(Math.min(1.25, this.worldScale));
@@ -589,9 +614,9 @@ export class App {
     this.billboards.update(
       dt, this.camera, this.rig.distance, store.state.hovered, store.state.selected,
     );
-    this.labels.update(dt, this.camera, this.rig.distance);
+    this.labels.update(dt, this.camera, this.rig.distance, store.state.selected);
     this.coreGlow.update(dt);
-    this.eraMarkers.update(dt, this.camera);
+    this.eraMarkers.update(dt, this.camera, this.rig.distance);
     this.printingTrail.update(dt);
 
     const moving = this.rig.idleSeconds < 0.35 || this.starfield.isMorphing || this.rig.isCinematic;

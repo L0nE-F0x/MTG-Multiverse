@@ -80,6 +80,8 @@ export class CameraRig {
     duration: number;
     from: { theta: number; phi: number; radius: number; target: THREE.Vector3 };
     to: { theta: number; phi: number; radius: number; target: THREE.Vector3 };
+    /** World XZ angle of the colour arm, or null for a straight core→rim lerp. */
+    armWorld: number | null;
   } | null = null;
 
   constructor(camera: THREE.PerspectiveCamera, element: HTMLElement) {
@@ -269,6 +271,7 @@ export class CameraRig {
     this.cinematic = {
       t: 0,
       duration,
+      armWorld: null,
       from: {
         theta: this.theta,
         phi: 1.22,
@@ -306,6 +309,37 @@ export class CameraRig {
     this.poke();
   }
 
+  /**
+   * Swoop onto a colour arm: shortest-arc heading, a dip through the mid-disc
+   * along that ray, then settle at the framed view looking down it. Clicking
+   * the pie used to snap `goalTheta` and reframe, which read as a teleport.
+   */
+  playArmFlight(worldAngle: number, framed: number, framePhi: number, duration = 2.15): void {
+    const destTheta = Math.PI / 2 - worldAngle;
+    this.cinematic = {
+      t: 0,
+      duration,
+      armWorld: worldAngle,
+      from: {
+        theta: this.theta,
+        phi: this.phi,
+        radius: this.radius,
+        target: this.target.clone(),
+      },
+      to: {
+        theta: this.theta + shortestDelta(this.theta, destTheta),
+        phi: framePhi,
+        radius: framed,
+        target: new THREE.Vector3(0, 0, 0),
+      },
+    };
+    this.goalTheta = this.cinematic.to.theta;
+    this.goalPhi = this.cinematic.to.phi;
+    this.goalRadius = this.cinematic.to.radius;
+    this.goalTarget.copy(this.cinematic.to.target);
+    this.poke();
+  }
+
   /** Jump the orbit radius without animating — used to set up an approach. */
   setRadius(radius: number): void {
     this.radius = clamp(radius, this.minRadius, this.maxRadius);
@@ -337,14 +371,29 @@ export class CameraRig {
       const b = this.cinematic.to;
       this.theta = a.theta + (b.theta - a.theta) * s;
       this.phi = a.phi + (b.phi - a.phi) * s;
-      this.radius = a.radius + (b.radius - a.radius) * s;
+      const dip = this.cinematic.armWorld === null ? 0 : Math.sin(Math.PI * s);
+      this.radius = (a.radius + (b.radius - a.radius) * s) * (1 - 0.34 * dip);
       this.target.lerpVectors(a.target, b.target, s);
+      if (this.cinematic.armWorld !== null && dip > 0.001) {
+        // Slide the pivot out along the arm at mid-flight so the camera
+        // actually travels the ray, then return it to the origin to settle.
+        const mid = 155 * dip;
+        this.target.x += Math.cos(this.cinematic.armWorld) * mid;
+        this.target.z += Math.sin(this.cinematic.armWorld) * mid;
+      }
       this.goalTheta = this.theta;
       this.goalPhi = this.phi;
       this.goalRadius = this.radius;
       this.goalTarget.copy(this.target);
       this.applyImmediate();
-      if (u >= 1) this.cinematic = null;
+      if (u >= 1) {
+        this.goalTheta = b.theta;
+        this.goalPhi = b.phi;
+        this.goalRadius = b.radius;
+        this.goalTarget.copy(b.target);
+        this.cinematic = null;
+        this.poke();
+      }
       return;
     }
 
@@ -411,4 +460,12 @@ export class CameraRig {
 
 function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
+}
+
+/** Signed angle from `from` to `to` in (−π, π]. */
+function shortestDelta(from: number, to: number): number {
+  let d = (to - from) % (Math.PI * 2);
+  if (d > Math.PI) d -= Math.PI * 2;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return d;
 }

@@ -64,6 +64,8 @@ export class StarLabels {
 
   private sinceSelect = RESELECT_SECONDS;
   private enabled = true;
+  /** Opened card, or -1. When set, only that name is labelled. */
+  private pinned = -1;
 
   constructor(
     private readonly universe: Universe,
@@ -113,10 +115,20 @@ export class StarLabels {
     if (!v) for (const s of this.slots) s.targetOpacity = 0;
   }
 
-  update(dt: number, camera: THREE.PerspectiveCamera, orbitDistance: number): void {
+  update(
+    dt: number,
+    camera: THREE.PerspectiveCamera,
+    orbitDistance: number,
+    selected = -1,
+  ): void {
+    this.pinned = selected;
     // Too far and every label overlaps; too close and the card art says it
-    // better than any label could.
-    const active = this.enabled && orbitDistance > 46 && orbitDistance < 1500;
+    // better than any label could. A pinned card keeps its name even close in.
+    const active = this.enabled && (
+      selected >= 0
+        ? orbitDistance > 20 && orbitDistance < 1500
+        : orbitDistance > 46 && orbitDistance < 1500
+    );
 
     camera.getWorldPosition(this.camPos);
     camera.getWorldDirection(this.viewDir);
@@ -156,6 +168,11 @@ export class StarLabels {
    * into a stack of overlapping names.
    */
   private select(camera: THREE.PerspectiveCamera): void {
+    if (this.pinned >= 0) {
+      this.candCount = 1;
+      this.candIdx[0] = this.pinned;
+      return;
+    }
     const pop = this.universe.col.popularity;
     const mask = this.mask;
     const { a, b, morph } = this.starfield.positionBuffers;

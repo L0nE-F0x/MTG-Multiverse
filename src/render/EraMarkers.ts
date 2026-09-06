@@ -6,12 +6,25 @@ interface Marker {
   sprite: THREE.Sprite;
   material: THREE.SpriteMaterial;
   world: THREE.Vector3;
+  ring: THREE.LineLoop;
+  ringMaterial: THREE.LineBasicMaterial;
 }
 
 /** Label texture dimensions; the sprite has to keep this aspect or it stretches. */
-const LABEL_W = 320;
-const LABEL_H = 64;
+const LABEL_W = 384;
+const LABEL_H = 80;
 const LABEL_ASPECT = LABEL_H / LABEL_W;
+/** Constant screen size (sizeAttenuation off). Matches the star-name labels. */
+const SCREEN_W = 0.145;
+const SCREEN_H = SCREEN_W * LABEL_ASPECT;
+
+/**
+ * One spoke for every era label. Alpha and Revised used to share an azimuth
+ * and stack; they now have a radial gap, so a single ruler-ray reads as ticks
+ * on the radius-is-time axis instead of four names sprinkled around the disc.
+ * 0.62 sits in the gap between white and blue.
+ */
+const SPOKE = 0.62;
 
 /**
  * Radius of the ring holding the first card released in `year`.
@@ -58,16 +71,14 @@ export class EraMarkers {
       { label: String(last), year: last },
     ];
 
-    // ChronoRank piles Alpha and Revised close together (Magic printed little
-    // in 1993–94). A shared azimuth then stacked the sprites. Fan them a few
-    // degrees and keep a minimum radial gap so the landmarks stay distinct.
-    const MIN_GAP = 48;
+    const MIN_GAP = 78;
     let lastR = -Infinity;
     for (let i = 0; i < eras.length; i++) {
       const era = eras[i]!;
       let r = radiusOfYear(ctx, era.year);
       if (r - lastR < MIN_GAP) r = lastR + MIN_GAP;
       lastR = r;
+
       const tex = labelTexture(era.label);
       const material = new THREE.SpriteMaterial({
         map: tex,
@@ -75,14 +86,26 @@ export class EraMarkers {
         depthTest: false,
         depthWrite: false,
         opacity: 0.9,
+        sizeAttenuation: false,
       });
       const sprite = new THREE.Sprite(material);
-      sprite.scale.set(70, 70 * LABEL_ASPECT, 1);
-      const a = 0.18 + i * 0.28;
-      sprite.position.set(r * Math.cos(a), 28, r * Math.sin(a));
+      sprite.scale.set(SCREEN_W, SCREEN_H, 1);
+      // Alternate sides of the spoke so Alpha/Revised never sit on top of
+      // each other once the labels are large enough to read from the frame.
+      const a = SPOKE + (i % 2 === 0 ? -0.16 : 0.16);
+      sprite.position.set(r * Math.cos(a), 26, r * Math.sin(a));
       sprite.renderOrder = 20;
       this.group.add(sprite);
-      this.markers.push({ sprite, material, world: sprite.position.clone() });
+
+      const { line, material: ringMaterial } = makeRing(r);
+      this.group.add(line);
+      this.markers.push({
+        sprite,
+        material,
+        world: sprite.position.clone(),
+        ring: line,
+        ringMaterial,
+      });
     }
   }
 
@@ -92,17 +115,21 @@ export class EraMarkers {
 
   setEnabled(v: boolean): void { this.enabled = v; }
 
-  update(dt: number, camera: THREE.PerspectiveCamera): void {
+  update(dt: number, camera: THREE.PerspectiveCamera, orbitDistance = 800): void {
     this.opacity += (this.target - this.opacity) * (1 - Math.exp(-dt * 3));
     const show = this.enabled && this.opacity > 0.02;
     this.group.visible = show;
     if (!show) return;
     camera.getWorldPosition(this.camPos);
+    // Rings are the framed-view landmark; up close they become huge circles
+    // through the camera and read as a glitch. Labels stay, a bit quieter.
+    const ringFade = smoothstep(200, 380, orbitDistance);
+    const labelFade = 0.45 + 0.55 * smoothstep(80, 200, orbitDistance);
     for (const m of this.markers) {
-      m.material.opacity = 0.82 * this.opacity;
-      const d = m.world.distanceTo(this.camPos);
-      const s = Math.max(28, Math.min(90, d * 0.08));
-      m.sprite.scale.set(s, s * LABEL_ASPECT, 1);
+      m.material.opacity = 0.92 * this.opacity * labelFade;
+      m.ringMaterial.opacity = 0.20 * this.opacity * ringFade;
+      m.ring.visible = ringFade > 0.02;
+      m.sprite.scale.set(SCREEN_W, SCREEN_H, 1);
     }
   }
 
@@ -111,8 +138,41 @@ export class EraMarkers {
       m.material.map?.dispose();
       m.material.dispose();
       this.group.remove(m.sprite);
+      m.ring.geometry.dispose();
+      m.ringMaterial.dispose();
+      this.group.remove(m.ring);
     }
   }
+}
+
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+function makeRing(radius: number): { line: THREE.LineLoop; material: THREE.LineBasicMaterial } {
+  const segs = 160;
+  const pos = new Float32Array(segs * 3);
+  for (let i = 0; i < segs; i++) {
+    const a = (i / segs) * Math.PI * 2;
+    pos[i * 3] = Math.cos(a) * radius;
+    pos[i * 3 + 1] = 0;
+    pos[i * 3 + 2] = Math.sin(a) * radius;
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const material = new THREE.LineBasicMaterial({
+    color: 0x9bb8e0,
+    transparent: true,
+    opacity: 0.2,
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const line = new THREE.LineLoop(geometry, material);
+  line.frustumCulled = false;
+  line.renderOrder = 8;
+  return { line, material };
 }
 
 function labelTexture(text: string): THREE.CanvasTexture {
@@ -123,12 +183,14 @@ function labelTexture(text: string): THREE.CanvasTexture {
   canvas.height = h;
   const ctx = canvas.getContext('2d')!;
   ctx.clearRect(0, 0, w, h);
-  ctx.font = '600 28px ui-sans-serif, Inter, system-ui, sans-serif';
+  ctx.font = '600 40px ui-sans-serif, Inter, system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.shadowColor = 'rgba(0,0,0,0.85)';
-  ctx.shadowBlur = 8;
-  ctx.fillStyle = 'rgba(220,230,245,0.92)';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = 'rgba(2, 4, 10, 0.92)';
+  ctx.lineWidth = 10;
+  ctx.strokeText(text.toUpperCase(), w / 2, h / 2);
+  ctx.fillStyle = 'rgba(232, 242, 255, 0.96)';
   ctx.fillText(text.toUpperCase(), w / 2, h / 2);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;

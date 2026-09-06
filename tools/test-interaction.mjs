@@ -567,6 +567,53 @@ try {
   });
   check('Bloom slider explains itself on hover', /glow|halo/i.test(bloomTip), bloomTip || 'missing data-tip');
 
+  // --- arm flight, focus dim, era ticks, newest-set pulse --------------------
+  await page.evaluate(() => {
+    window.__mcu.store.set('layout', 'galaxy');
+    window.__mcu.store.set('selected', -1);
+    window.__mcu.store.set('cameraCue', { kind: 'arm', color: 'U' });
+  });
+  await sleep(180);
+  const armFlying = await page.evaluate(() => window.__mcu.app.rig.isCinematic);
+  check('a colour-pie click starts an arm flight', armFlying === true);
+  await sleep(2400);
+  const armSettled = await page.evaluate(() => {
+    const dest = Math.PI / 2 - (Math.PI * 2) / 5;
+    const h = window.__mcu.app.rig.heading;
+    const err = Math.abs(Math.atan2(Math.sin(h - dest), Math.cos(h - dest)));
+    return { cinematic: window.__mcu.app.rig.isCinematic, err };
+  });
+  check('the arm flight settles looking at blue',
+    armSettled.cinematic === false && armSettled.err < 0.18,
+    `cinematic=${armSettled.cinematic} err=${armSettled.err.toFixed(3)}`);
+
+  const focusOn = await page.evaluate(() => {
+    const i = window.__mcu.universe.search('Sol Ring', 1)[0];
+    window.__mcu.store.set('selected', i);
+    return i;
+  });
+  await sleep(500);
+  const focused = await page.evaluate(() => window.__mcu.app.starfield.material.uniforms.uFocus.value);
+  check('selecting a card focuses the field on it', focused > 0.6, `uFocus=${Number(focused).toFixed(2)}`);
+  await page.evaluate(() => window.__mcu.store.set('selected', -1));
+  await sleep(500);
+  const unfocused = await page.evaluate(() => window.__mcu.app.starfield.material.uniforms.uFocus.value);
+  check('deselecting restores the rest of the field', unfocused < 0.25, `uFocus=${Number(unfocused).toFixed(2)}`);
+
+  const eras = await page.evaluate(() => {
+    const g = window.__mcu.app.eraMarkers.group;
+    return { visible: g.visible, n: g.children.length };
+  });
+  check('era ticks are drawn in the galaxy layout', eras.visible === true && eras.n >= 8,
+    `visible=${eras.visible} children=${eras.n}`);
+
+  const fresh = await page.evaluate(() => ({
+    pulse: window.__mcu.app.starfield.material.uniforms.uFresh.value,
+    set: window.__mcu.app.starfield.material.uniforms.uNewestSet.value,
+  }));
+  check('the newest set is pulsing after boot', fresh.pulse > 0.05 && fresh.set >= 0,
+    `uFresh=${Number(fresh.pulse).toFixed(2)} set=${fresh.set}`);
+
   // --- the embed message channel ---------------------------------------------
   // The host drives highlighting over postMessage. Nothing else in the suite
   // frames the app, so nothing else exercises embed.ts at all.

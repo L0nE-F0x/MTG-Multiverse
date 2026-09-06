@@ -199,6 +199,16 @@ export class CardBillboards {
     this.candCount = 0;
     let worst = -Infinity;
 
+    // A selected card is the subject. Other billboards in the neighbourhood
+    // steal the reading — the reprint thread and that one face are the point.
+    if (selected >= 0) {
+      if (!this.failed.has(selected)) this.insert(selected, Infinity);
+      if (hovered >= 0 && hovered !== selected && !this.failed.has(hovered)) {
+        this.insert(hovered, Infinity);
+      }
+      return;
+    }
+
     // Flat buffer walk: a Vector3 round-trip per card costs more than the whole
     // rest of this loop at 117k iterations.
     const { a, b, morph } = this.starfield.positionBuffers;

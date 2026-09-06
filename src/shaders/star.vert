@@ -14,6 +14,8 @@ uniform float uExposure;
 uniform float uHoverOracle;
 uniform float uSelectedOracle;
 uniform float uNewestSet;
+uniform float uFresh;
+uniform float uFocus;
 uniform float uFormatBit;
 uniform float uHighlightOn;
 
@@ -96,6 +98,14 @@ void main() {
   clamped *= 1.0 + vHighlight * 1.85 + vKin * 0.22;
   bright *= 1.0 + vHighlight * 1.65 + vKin * 0.55;
 
+  // Selected-card dim: everything that is not this card (or a printing of
+  // it, or the star under the cursor) drops, so the reprint thread is the
+  // thing that reads. Hover stays bright so the next click is still findable.
+  float keep = max(max(kinSel, selected), hovered);
+  float outsider = uFocus * (1.0 - keep);
+  clamped *= mix(1.0, 0.32, outsider);
+  bright *= mix(1.0, 0.07, outsider);
+
   // Deck / collection lift. Kept off vHighlight so a hundred-card list does
   // not grow a cyan ring on every printing — that path is for hover/select.
   if (uHighlightOn > 0.5) {
@@ -103,10 +113,13 @@ void main() {
     bright *= 1.0 + aHighlight * 1.2;
   }
 
-  // Newest set is a bright knot on the rim — the whole printing, not one star.
-  float fresh = step(abs(aSetIdx - uNewestSet), 0.5) * step(0.0, uNewestSet);
-  clamped *= 1.0 + fresh * 0.55;
-  bright *= 1.0 + fresh * 0.45;
+  // Newest set: a one-shot pulse on the rim after boot, then it goes quiet.
+  // Leaving it on forever made the latest printing look like a permanent
+  // special class of star.
+  float fresh = step(abs(aSetIdx - uNewestSet), 0.5) * step(0.0, uNewestSet) * uFresh;
+  float pulse = 0.35 + 0.65 * abs(sin(uTime * 2.35));
+  clamped *= 1.0 + fresh * 0.95 * pulse;
+  bright *= 1.0 + fresh * 0.80 * pulse;
 
   gl_PointSize = min(clamped, 220.0);
 
