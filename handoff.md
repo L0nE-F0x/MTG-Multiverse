@@ -13,10 +13,12 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 # ▶ START HERE — next session
 
-**2026-09-06 — the v3.7.0 audit is cleared. `AUDIT-2026-09-05.md` is done.**
+**2026-09-06 — the v3.7.0 audit is cleared, and FND v3.7.1 ships it.**
 
-Every finding in that file is fixed, across both repos. Nothing is committed
-yet in either; both working trees hold the changes.
+Every finding in `AUDIT-2026-09-05.md` is fixed, across both repos, committed
+and pushed. **Filthy Net Deck v3.7.1 is released** — signed Windows installer,
+macOS dmg, Linux pacman package — so the fixes below are in the vendored
+`public/aetherfield/` that FND users actually run, not only on Netlify.
 
 Three that were hurting live users:
 
