@@ -23,6 +23,16 @@
   color: var(--mcu-cyan);
   border-color: var(--mcu-border-strong);
 }
+/* Icon on a phone, word everywhere else. See the comment in settings.ts. */
+.mcu-settings-toggle-icon {
+  display: none;
+  width: 20px;
+  height: 20px;
+  fill: var(--mcu-bg-deep);
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+}
 
 .mcu-settings {
   position: fixed;
@@ -133,21 +143,46 @@
 
 @media (max-width: 900px) {
   .mcu-settings-toggle {
-    top: 10px;
-    right: calc(10px + var(--mcu-inset-right, 0px));
-    padding: 7px 12px;
-    font-size: 9px;
-    min-height: var(--mcu-touch);
+    /* Centred in the top row rather than pinned to its top edge: the wordmark
+       card is the tallest thing on the row and sets its height, and two
+       shorter controls hanging off the top of it read as misaligned. */
+    top: calc(10px + var(--mcu-safe-top) + (var(--mcu-topbar-h, 46px) - 38px) / 2);
+    /*
+     * No `--mcu-inset-right` here. That inset is the card panel's footprint,
+     * and dodging it is right on a desktop where the panel runs the full
+     * height of the window. On a phone the card panel is a floating card that
+     * starts *below* this row, so subtracting its ~340px width slid the
+     * settings button 350px left and parked it underneath the wordmark.
+     */
+    right: calc(10px + var(--mcu-safe-right));
+    padding: 0;
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    position: fixed;
   }
+  /* 38px of visible button, 44px of hit area — the same split the "?" control
+     uses, for the same reason: this button sets the height of the top row. */
+  .mcu-settings-toggle::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 11px;
+  }
+  .mcu-settings-toggle-word { display: none; }
+  .mcu-settings-toggle-icon { display: block; }
   /* Sit clear of the top command bar/search and the bottom layout switcher
      — see the matching comment in filters.css for why top:0/bottom:0 was
      wrong on a phone-width viewport. */
   .mcu-settings {
     top: var(--mcu-mobile-panel-top);
     bottom: var(--mcu-mobile-panel-bottom);
-    right: calc(10px + var(--mcu-inset-right, 0px));
+    /* Same reasoning as the toggle above: on a phone there is no room to
+       stand beside the card panel, and this one is above it in z anyway. */
+    right: calc(10px + var(--mcu-safe-right));
     width: 82vw;
     max-width: 320px;
     max-height: none;

@@ -1,13 +1,18 @@
 /**
  * Colour-pie compass. Click an arm to fly the camera onto it.
  *
- * The wedges are Magic's WUBRG pentagon, the same angles the galaxy layout
- * uses. A heading tick follows the camera so you can see which arm you are
- * looking at without reading the stars.
+ * The wedges sit at `store.armAngles` — where each colour's cards *measure*,
+ * not the pentagon they are seeded from. The galaxy's arms are a spiral, so
+ * every one of them ends up about 117 degrees around from its base angle, and
+ * a pie drawn on the base angles was a compass pointing at the wrong colour.
+ *
+ * The whole dial is a plain top-down view of the world: SVG +x is world +x,
+ * SVG +y (down the screen) is world +z. No CSS rotation, no counter-rotated
+ * letters, and the heading tick is simply the camera's own XZ direction, so
+ * the tick lands on the wedge whose stars are nearest the camera.
  */
 import { store, type LayoutMode } from '../core/store.ts';
-import { COLOR_BIT, type ColorLetter } from '../data/format.ts';
-import { COLOR_ANGLE } from '../layout/layouts.ts';
+import type { ColorLetter } from '../data/format.ts';
 import { el, listen } from './dom.ts';
 import { MANA_UI_HEX } from './theme.ts';
 import '../styles/minimap.css';
@@ -19,6 +24,13 @@ const ARMS: { letter: ColorLetter; label: string; fill: string }[] = [
   { letter: 'R', label: 'Red', fill: MANA_UI_HEX.R! },
   { letter: 'G', label: 'Green', fill: MANA_UI_HEX.G! },
 ];
+
+const TAU = Math.PI * 2;
+
+/** Normalise to [0, TAU). */
+function norm(a: number): number {
+  return ((a % TAU) + TAU) % TAU;
+}
 
 /** Layouts where colour identity is still a spatial axis. */
 const COLOUR_LAYOUTS: LayoutMode[] = ['galaxy', 'colorwheel', 'price'];
@@ -51,6 +63,7 @@ export function mountMinimap(root: HTMLElement): { destroy(): void } {
   ring.setAttribute('class', 'mcu-minimap-ring');
   svg.append(ring);
 
+  const wedges = new Map<ColorLetter, { path: SVGPathElement; text: SVGTextElement }>();
   for (const { letter, label, fill } of ARMS) {
     const group = document.createElementNS(svgNS, 'g');
     group.setAttribute('data-arm', letter);
@@ -58,27 +71,47 @@ export function mountMinimap(root: HTMLElement): { destroy(): void } {
     group.setAttribute('aria-label', label);
     group.style.cursor = 'pointer';
 
-    const a0 = COLOR_ANGLE[COLOR_BIT[letter]]! - Math.PI / 5;
-    const a1 = COLOR_ANGLE[COLOR_BIT[letter]]! + Math.PI / 5;
     const path = document.createElementNS(svgNS, 'path');
-    path.setAttribute('d', annular(a0, a1, 0.36, 1.0));
     path.setAttribute('fill', fill);
     group.append(path);
 
-    const mid = COLOR_ANGLE[COLOR_BIT[letter]]!;
-    const tx = Math.cos(mid) * 0.70;
-    const ty = Math.sin(mid) * 0.70;
     const text = document.createElementNS(svgNS, 'text');
-    text.setAttribute('x', tx.toFixed(3));
-    text.setAttribute('y', ty.toFixed(3));
     text.setAttribute('class', 'mcu-minimap-letter');
     text.setAttribute('text-anchor', 'middle');
     text.setAttribute('dominant-baseline', 'middle');
-    // Counter-rotate so the letters stay upright after the SVG's -90° turn.
-    text.setAttribute('transform', `rotate(90 ${tx.toFixed(3)} ${ty.toFixed(3)})`);
     text.textContent = letter;
     group.append(text);
+
+    wedges.set(letter, { path, text });
     svg.append(group);
+  }
+
+  /**
+   * Lay the five wedges out on the measured angles.
+   *
+   * Boundaries are the midpoints between neighbours rather than a fixed
+   * ±36°, so the dial still tiles cleanly if a layout spaces its colours
+   * unevenly — and it degenerates to the even pentagon when they are even,
+   * which is what the galaxy gives.
+   */
+  function paintWedges(): void {
+    const angles = store.state.armAngles;
+    const order = ARMS.map(({ letter }) => ({ letter, angle: norm(angles[letter] ?? 0) }))
+      .sort((a, b) => a.angle - b.angle);
+    for (let k = 0; k < order.length; k++) {
+      const cur = order[k]!;
+      const prev = order[(k - 1 + order.length) % order.length]!;
+      const next = order[(k + 1) % order.length]!;
+      const a0 = cur.angle - norm(cur.angle - prev.angle) / 2;
+      const a1 = cur.angle + norm(next.angle - cur.angle) / 2;
+      const w = wedges.get(cur.letter);
+      if (!w) continue;
+      w.path.setAttribute('d', annular(a0, a1, 0.36, 1.0));
+      const tx = Math.cos(cur.angle) * 0.70;
+      const ty = Math.sin(cur.angle) * 0.70;
+      w.text.setAttribute('x', tx.toFixed(3));
+      w.text.setAttribute('y', ty.toFixed(3));
+    }
   }
 
   const core = document.createElementNS(svgNS, 'circle');
@@ -86,8 +119,10 @@ export function mountMinimap(root: HTMLElement): { destroy(): void } {
   core.setAttribute('class', 'mcu-minimap-core');
   svg.append(core);
 
+  // Points along +x at rotation 0, so the transform below is the camera's
+  // world XZ angle with no offset to get wrong.
   const needle = document.createElementNS(svgNS, 'polygon');
-  needle.setAttribute('points', '0,-1.20 0.085,-0.98 -0.085,-0.98');
+  needle.setAttribute('points', '1.20,0 0.98,0.085 0.98,-0.085');
   needle.setAttribute('class', 'mcu-minimap-needle');
   svg.append(needle);
 
@@ -142,8 +177,10 @@ export function mountMinimap(root: HTMLElement): { destroy(): void } {
   root.append(wrap, floatTip);
 
   function paintHeading(): void {
-    // Camera theta 0 sits on +Z; white is +X. π/2 - heading maps the view
-    // onto the pie, matching consumeCue's arm flight (`π/2 - world`).
+    // The rig puts the camera at (sin θ, ·, cos θ), so its world XZ angle is
+    // π/2 - θ. The dial is world XZ, so that number is the rotation directly —
+    // and it is the same expression `playArmFlight` inverts to aim, which is
+    // what keeps the tick on the wedge you clicked.
     const deg = ((Math.PI / 2 - store.state.viewHeading) * 180) / Math.PI;
     needle.setAttribute('transform', `rotate(${deg.toFixed(2)})`);
   }
@@ -162,9 +199,11 @@ export function mountMinimap(root: HTMLElement): { destroy(): void } {
     }
   }
 
+  paintWedges();
   paintHeading();
   paintLayout();
   paintShell();
+  const offArms = store.on('armAngles', paintWedges);
   const offHeading = store.on('viewHeading', paintHeading);
   const offLayout = store.on('layout', paintLayout);
   const offShell = store.on('shell', paintShell);
@@ -172,6 +211,7 @@ export function mountMinimap(root: HTMLElement): { destroy(): void } {
 
   return {
     destroy() {
+      offArms();
       offHeading();
       offLayout();
       offShell();

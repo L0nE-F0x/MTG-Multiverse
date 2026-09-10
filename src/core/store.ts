@@ -113,6 +113,19 @@ export interface AppState {
   highlightOracles: Set<number>;
   /** Camera azimuth, radians. The colour-pie compass uses this as a heading. */
   viewHeading: number;
+  /**
+   * Where each colour's cards actually are, as a world XZ angle, measured from
+   * the layout the renderer is currently showing.
+   *
+   * It is not `COLOR_ANGLE`. The galaxy's arms are a spiral: a star's angle is
+   * its arm's base angle plus `radius * TWIST`, and across the populated part
+   * of the disc that adds about 117 degrees. Aiming the camera at the base
+   * angle therefore landed two wedges away — click White, arrive at Red — for
+   * as long as the compass has existed. Measuring the circular mean of the
+   * mono-coloured cards' positions is also the only version that survives a
+   * layout change, since colour is a different axis in each one.
+   */
+  armAngles: Record<ColorLetter, number>;
 }
 
 export function defaultFilter(): FilterState {
@@ -132,6 +145,12 @@ export function defaultFilter(): FilterState {
     hideTokens: true,
     oracles: new Set(),
   };
+}
+
+/** Pentagon fallback, used until the renderer has measured a layout. */
+export function defaultArmAngles(): Record<ColorLetter, number> {
+  const TAU = Math.PI * 2;
+  return { W: 0, U: TAU / 5, B: (2 * TAU) / 5, R: (3 * TAU) / 5, G: (4 * TAU) / 5 };
 }
 
 export function defaultInsets(): ViewInsets {
@@ -177,6 +196,7 @@ class Store {
     cinematic: false,
     highlightOracles: new Set(),
     viewHeading: 0,
+    armAngles: defaultArmAngles(),
   };
 
   private listeners = new Map<StateKey, Set<Listener<never>>>();

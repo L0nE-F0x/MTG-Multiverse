@@ -15,6 +15,7 @@ import {
   DISCLAIMER,
 } from './brand.ts';
 import { el, fmtInt, listen } from './dom.ts';
+import { autoEnterFullscreen } from './fullscreen.ts';
 import { MANA_UI_HEX } from './theme.ts';
 import '../styles/title.css';
 
@@ -176,7 +177,17 @@ export function mountTitle(root: HTMLElement, universe: Universe, host: TitleHos
     setTitleOpen(false);
   }
 
-  const offEnter = listen(enterBtn, 'click', enter);
+  /*
+   * The one tap every visit already makes, which is why fullscreen is asked
+   * for here: `requestFullscreen` needs a live user gesture, and this handler
+   * is the only place in the play path that reliably has one. `enter()` itself
+   * is also reached programmatically (the capture harness, `?shell=play`), so
+   * it is deliberately not the hook.
+   */
+  const offEnter = listen(enterBtn, 'click', () => {
+    autoEnterFullscreen();
+    enter();
+  });
   const offTour = listen(tourBtn, 'click', () => host.onTour());
   const offSettings = listen(settingsBtn, 'click', () => {
     host.toggleSettings();

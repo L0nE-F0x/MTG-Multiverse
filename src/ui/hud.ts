@@ -32,6 +32,8 @@ const LAYOUTS: { mode: LayoutMode; label: string; desc: string }[] = [
 export function mountHud(root: HTMLElement, universe: Universe, hooks: HudHooks): HudHandle {
   // ---- Command bar --------------------------------------------------
   const countN = el('span', { className: 'mcu-command-count-n' });
+  const countSep = el('span', { className: 'mcu-command-count-sep' });
+  const countUnit = el('span', { className: 'mcu-command-count-unit' });
   const countExtra = el('span', { className: 'mcu-command-count-extra' });
   const aboutBtn = el('button', {
     className: 'mcu-about-btn',
@@ -55,24 +57,37 @@ export function mountHud(root: HTMLElement, universe: Universe, hooks: HudHooks)
       { className: 'mcu-command-count', attrs: { 'aria-live': 'polite', 'aria-atomic': 'true' } },
       [
         countN,
-        document.createTextNode(' of '),
+        countSep,
         el('span', { className: 'mcu-command-count-total', text: fmtInt(universe.count) }),
-        document.createTextNode(' stars visible'),
+        countUnit,
         countExtra,
       ],
     ),
   ]);
   root.append(commandBar);
 
+  /*
+   * The card is as wide as its longest line, and on a phone that line was
+   * "111,720 of 117,621 stars visible" — wider than the wordmark above it and
+   * wide enough that search had nowhere to sit but a second row. The compact
+   * form says the same thing in a third of the width. Written from JS rather
+   * than hidden with CSS because the separator has to *change*, not vanish.
+   */
+  const narrow = window.matchMedia('(max-width: 900px)');
+
   function paintCount(): void {
+    const compact = narrow.matches;
     countN.textContent = fmtInt(store.state.matchCount);
+    countSep.textContent = compact ? ' / ' : ' of ';
+    countUnit.textContent = compact ? '' : ' stars visible';
     const deck = store.state.filter.oracles.size;
     const lit = store.state.highlightOracles.size;
-    if (deck > 0) countExtra.textContent = ` · ${fmtInt(deck)}-card deck`;
-    else if (lit > 0) countExtra.textContent = ` · ${fmtInt(lit)} highlighted`;
+    if (deck > 0) countExtra.textContent = compact ? ` · ${fmtInt(deck)} deck` : ` · ${fmtInt(deck)}-card deck`;
+    else if (lit > 0) countExtra.textContent = compact ? ` · ${fmtInt(lit)} lit` : ` · ${fmtInt(lit)} highlighted`;
     else countExtra.textContent = '';
   }
   paintCount();
+  narrow.addEventListener('change', paintCount);
   const offMatch = store.on('matchCount', paintCount);
   const offHighlight = store.on('highlightOracles', paintCount);
   const offFilterCount = store.on('filter', paintCount);
@@ -134,10 +149,30 @@ export function mountHud(root: HTMLElement, universe: Universe, hooks: HudHooks)
     const gap = parseFloat(getComputedStyle(switcher).bottom) || 0;
     root.style.setProperty('--mcu-hud-bottom', `${Math.round(gap + switcher.offsetHeight)}px`);
   };
-  reportHudBottom();
-  const hudBottomObserver = new ResizeObserver(reportHudBottom);
-  hudBottomObserver.observe(switcher);
-  window.addEventListener('resize', reportHudBottom);
+
+  /*
+   * The same trick along the top edge. On a phone the wordmark card, the
+   * search field and Settings share one row, and search is the elastic one:
+   * it fills whatever the other two leave. Its CSS cannot know how wide a
+   * card holding a live six-digit count turns out to be, so the card says.
+   *
+   * `--mcu-topbar-h` is the row's height, which the side panels start below.
+   */
+  const reportTopBar = (): void => {
+    const left = parseFloat(getComputedStyle(commandBar).left) || 0;
+    root.style.setProperty('--mcu-topbar-left', `${Math.round(left + commandBar.offsetWidth)}px`);
+    root.style.setProperty('--mcu-topbar-h', `${Math.round(commandBar.offsetHeight)}px`);
+  };
+
+  const reportChrome = (): void => {
+    reportHudBottom();
+    reportTopBar();
+  };
+  reportChrome();
+  const chromeObserver = new ResizeObserver(reportChrome);
+  chromeObserver.observe(switcher);
+  chromeObserver.observe(commandBar);
+  window.addEventListener('resize', reportChrome);
 
   function paintLayout(): void {
     const current = store.state.layout;
@@ -178,9 +213,12 @@ export function mountHud(root: HTMLElement, universe: Universe, hooks: HudHooks)
       offFilterCount();
       offLayout();
       offFormat();
-      hudBottomObserver.disconnect();
-      window.removeEventListener('resize', reportHudBottom);
+      narrow.removeEventListener('change', paintCount);
+      chromeObserver.disconnect();
+      window.removeEventListener('resize', reportChrome);
       root.style.removeProperty('--mcu-hud-bottom');
+      root.style.removeProperty('--mcu-topbar-left');
+      root.style.removeProperty('--mcu-topbar-h');
       commandBar.remove();
       switcher.remove();
     },

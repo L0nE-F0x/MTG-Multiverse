@@ -5,6 +5,12 @@
 import { resetSettings } from '../core/persist.ts';
 import { store } from '../core/store.ts';
 import { el, listen } from './dom.ts';
+import {
+  fullscreenSupported,
+  isFullscreen,
+  onFullscreenChange,
+  setFullscreen,
+} from './fullscreen.ts';
 import '../styles/settings.css';
 
 export interface SettingsHandle {
@@ -67,6 +73,35 @@ export function mountSettings(root: HTMLElement): SettingsHandle {
     row.setAttribute('data-tip', tip);
     return row;
   }
+
+  /*
+   * Fullscreen is not a `visual` setting: the renderer has no opinion on it,
+   * and "Reset look" should not drag someone back out of it. It reads and
+   * writes the real document state, and follows it when the system's own
+   * gesture leaves fullscreen behind our back.
+   */
+  function fullscreenRow(): HTMLElement | null {
+    if (!fullscreenSupported()) return null;
+    const input = el('input', { attrs: { type: 'checkbox' } });
+    input.checked = isFullscreen();
+    input.addEventListener('change', () => void setFullscreen(input.checked));
+    disposers.push(
+      onFullscreenChange(() => {
+        input.checked = isFullscreen();
+      }),
+    );
+    const row = el('label', { className: 'mcu-settings-checkbox-row' }, [
+      input,
+      document.createTextNode('Fullscreen'),
+    ]);
+    row.setAttribute(
+      'data-tip',
+      'Hide the browser and system bars. On a phone this is what removes the clock and battery strip along the top.',
+    );
+    return row;
+  }
+
+  const fullscreenRows = [fullscreenRow()].filter((r): r is HTMLElement => r !== null);
 
   const fpsEl = el('span', { className: 'mcu-telemetry-fps' });
   const visEl = el('span', { className: 'mcu-telemetry-visible' });
@@ -139,6 +174,7 @@ export function mountSettings(root: HTMLElement): SettingsHandle {
       'Slow orbit when you are not flying. Remembered between visits.',
       () => store.state.visual.autoRotate, (v) => store.patchVisual({ autoRotate: v }),
     ),
+    ...fullscreenRows,
     resetBtn,
     el('h3', { className: 'mcu-filter-heading', text: 'Telemetry' }),
     el('div', { className: 'mcu-telemetry' }, [
@@ -153,15 +189,37 @@ export function mountSettings(root: HTMLElement): SettingsHandle {
     body,
   ]);
   panel.id = 'mcu-settings-panel';
+  /*
+   * Word on a desktop, gear on a phone. The three top-left/top-right controls
+   * share one row under 900px, and "SETTINGS" at 9px still costs ~86px of it —
+   * against a search field with barely 200px to live in, that is the
+   * difference between a usable field and a stub. Both are in the DOM and CSS
+   * picks; the accessible name comes from `aria-label`, so it does not change
+   * with the breakpoint.
+   */
   const toggle = el('button', {
     className: 'mcu-settings-toggle',
-    text: 'SETTINGS',
     attrs: {
       type: 'button',
       'aria-expanded': 'false',
       'aria-controls': 'mcu-settings-panel',
+      'aria-label': 'Settings',
     },
-  });
+  }, [
+    el('span', { className: 'mcu-settings-toggle-word', text: 'SETTINGS' }),
+  ]);
+  toggle.insertAdjacentHTML(
+    'afterbegin',
+    // Sliders, not a cog: the panel behind this button is five sliders and four
+    // checkboxes, and a cog at 20px on a dark ground is a smudge. A rayed
+    // circle was the first attempt and read as a brightness control.
+    `<svg class="mcu-settings-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+       <path d="M4 7h16M4 12h16M4 17h16"/>
+       <circle cx="9" cy="7" r="2.2"/>
+       <circle cx="15.5" cy="12" r="2.2"/>
+       <circle cx="8" cy="17" r="2.2"/>
+     </svg>`,
+  );
   function setOpen(open: boolean): void {
     panel.classList.toggle('mcu-settings--open', open);
     toggle.setAttribute('aria-expanded', String(open));
@@ -212,6 +270,22 @@ export function mountSettings(root: HTMLElement): SettingsHandle {
 
   root.append(toggle, panel, floatTip);
 
+  /*
+   * How much of the top-right corner this control occupies, in the layout
+   * pixels the rest of the chrome is positioned in. Search fills the gap
+   * between this and the wordmark card (which publishes the matching
+   * `--mcu-topbar-left` from `hud.ts`), and neither width is a constant: this
+   * one swaps between a word and an icon at the breakpoint.
+   */
+  const reportTopBarRight = (): void => {
+    const right = parseFloat(getComputedStyle(toggle).right) || 0;
+    root.style.setProperty('--mcu-topbar-right', `${Math.round(right + toggle.offsetWidth)}px`);
+  };
+  reportTopBarRight();
+  const toggleObserver = new ResizeObserver(reportTopBarRight);
+  toggleObserver.observe(toggle);
+  disposers.push(listen(window, 'resize', reportTopBarRight));
+
   return {
     open() { setOpen(true); },
     close() { setOpen(false); },
@@ -219,6 +293,8 @@ export function mountSettings(root: HTMLElement): SettingsHandle {
     isOpen() { return panel.classList.contains('mcu-settings--open'); },
     destroy() {
       for (const off of disposers) off();
+      toggleObserver.disconnect();
+      root.style.removeProperty('--mcu-topbar-right');
       toggle.remove();
       panel.remove();
       floatTip.remove();

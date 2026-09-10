@@ -53,6 +53,12 @@
     padding: 8px 18px;
     font-size: 10px;
     letter-spacing: 0.1em;
+    /* Plain viewport centre, matching the switcher it floats above. On a
+       phone that bar is pinned to both edges rather than centred on the free
+       area, so keeping the panel-inset offset here would leave the two
+       visibly disagreeing by half the collapsed filter tab. */
+    left: 50%;
+    max-width: calc(100vw - 20px);
   }
 }
 

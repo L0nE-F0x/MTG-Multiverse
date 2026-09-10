@@ -14,12 +14,20 @@ export interface SearchHandle {
 }
 
 export function mountSearch(root: HTMLElement, universe: Universe): SearchHandle {
-  const placeholder = `Search ${universe.count.toLocaleString()} cards…`;
+  /*
+   * On a phone the field is one third of the top row and about 200px wide, so
+   * the full placeholder ("Search 117,621 cards…") is clipped mid-number and
+   * reads as a rendering fault. It expands to the whole row on focus, but the
+   * placeholder is only ever seen in the collapsed state.
+   */
+  const narrow = window.matchMedia('(max-width: 900px)');
+  const longPlaceholder = `Search ${universe.count.toLocaleString()} cards…`;
+  const shortPlaceholder = 'Search cards…';
   const input = el('input', {
     className: 'mcu-search-input',
     attrs: {
       type: 'text',
-      placeholder,
+      placeholder: narrow.matches ? shortPlaceholder : longPlaceholder,
       autocomplete: 'off',
       spellcheck: 'false',
       'aria-label': 'Search cards',
@@ -41,6 +49,24 @@ export function mountSearch(root: HTMLElement, universe: Universe): SearchHandle
     list,
   ]);
   root.append(wrap);
+
+  const paintPlaceholder = (): void => {
+    input.placeholder = narrow.matches ? shortPlaceholder : longPlaceholder;
+  };
+  narrow.addEventListener('change', paintPlaceholder);
+
+  /*
+   * While the field is in use it takes the whole top row, which means it is
+   * standing on the wordmark card and the settings button. Those are hidden
+   * from `base.css` off this class rather than left to show through: the input
+   * is a translucent panel, and CLAUDE.md already records what happens when
+   * something translucent is asked to occlude.
+   */
+  const setSearching = (on: boolean): void => {
+    root.classList.toggle('mcu-root--searching', on);
+  };
+  const offFocus = listen(input, 'focus', () => setSearching(true));
+  const offBlur = listen(input, 'blur', () => setSearching(false));
 
   let active = -1;
 
@@ -177,6 +203,10 @@ export function mountSearch(root: HTMLElement, universe: Universe): SearchHandle
   return {
     destroy() {
       runSearch.cancel();
+      narrow.removeEventListener('change', paintPlaceholder);
+      root.classList.remove('mcu-root--searching');
+      offFocus();
+      offBlur();
       offInput();
       offKeydown();
       offOutside();

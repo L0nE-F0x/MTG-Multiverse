@@ -26,10 +26,12 @@
   filter: saturate(0.4);
 }
 .mcu-minimap--muted:hover { opacity: 0.78; filter: saturate(0.8); }
+/* No rotation: the dial is a straight top-down view of the world (SVG +x is
+   world +x, SVG +y is world +z), which is what lets the heading tick be the
+   camera's own angle rather than that angle plus a constant nobody can check. */
 .mcu-minimap svg {
   width: 100%;
   height: 100%;
-  transform: rotate(-90deg);
   overflow: visible;
 }
 .mcu-minimap path {
@@ -74,5 +76,18 @@
 }
 
 @media (max-width: 900px) {
-  .mcu-minimap { width: 80px; height: 80px; right: 10px; bottom: 76px; padding: 6px; }
+  /*
+   * Above the bottom chrome, not beside it. The layout switcher now spans the
+   * full width of a phone, so a compass anchored at a constant 76px sat on top
+   * of the format row — `--mcu-hud-bottom` is what that row actually measures
+   * (hud.ts publishes it), and it already accounts for the switcher being a
+   * different height under this breakpoint.
+   */
+  .mcu-minimap {
+    width: 74px;
+    height: 74px;
+    right: calc(10px + var(--mcu-safe-right));
+    bottom: calc(var(--mcu-hud-bottom, 96px) + 12px);
+    padding: 5px;
+  }
 }

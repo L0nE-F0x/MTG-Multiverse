@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CameraRig } from './CameraRig.ts';
-import { store, type CameraCue, type LayoutMode, type VisualState } from './store.ts';
+import { store, type CameraCue, type ColorLetter, type LayoutMode, type VisualState } from './store.ts';
 import { Starfield } from '../render/Starfield.ts';
 import { Nebula } from '../render/Nebula.ts';
 import { Picker } from '../render/Picker.ts';
@@ -18,6 +18,13 @@ import type { Universe } from '../data/universe.ts';
 
 const FOV = 55;
 const CLICK_SLOP_PX = 5;
+
+/**
+ * How much of the whole-layout framing distance an arm flight settles at.
+ * The arm is on the near side by then, so this is roughly "the colour fills
+ * the screen" without losing the shape of the galaxy behind it.
+ */
+const ARM_FLIGHT_FRACTION = 0.6;
 
 /**
  * Quality ladder, cheapest first.
@@ -161,6 +168,7 @@ export class App {
     // smudge, then ease in. The low seeded damping relaxes back to normal over
     // the next second, so the approach starts slow and gathers pace instead of
     // sliding in at a constant rate.
+    this.measureArmAngles();
     const framed = this.framedDistance();
     this.rig.setPhi(this.starfield.framePhi());
     this.rig.setRadius(framed * 3.4);
@@ -385,6 +393,7 @@ export class App {
 
   private applyLayout(mode: LayoutMode): void {
     this.starfield.setLayout(mode);
+    this.measureArmAngles();
     this.targetWorldScale = this.starfield.boundingRadius / this.galaxyBound;
     this.eraMarkers.setLayout(mode);
     this.nebula.setLayout(mode, {
@@ -489,6 +498,67 @@ export class App {
     this.applyNebulaDensity();
   }
 
+  /**
+   * Where each colour actually sits in the layout the renderer is showing.
+   *
+   * Circular mean of the mono-coloured cards' XZ direction, taken from the
+   * *target* buffer so a click during a morph aims at where the stars are
+   * going rather than at where they were. `COLOR_ANGLE` is the arm's base
+   * angle at the very centre of the disc, and the spiral adds `radius * TWIST`
+   * on top of it — about 117 degrees across the populated radii — so the base
+   * angle is roughly two wedges away from the arm anyone can see. It is kept
+   * only as the fallback for a layout where colour has no direction at all
+   * (the rarity shells, the year rings): there the mean vector collapses
+   * toward zero length, and a direction read off it would be noise.
+   */
+  private measureArmAngles(): void {
+    const pos = this.starfield.positionBuffers.b;
+    const identity = this.universe.col.colorIdentity;
+    const n = this.universe.count;
+    const letters: ColorLetter[] = ['W', 'U', 'B', 'R', 'G'];
+    const sx = new Float64Array(5);
+    const sz = new Float64Array(5);
+    const count = new Int32Array(5);
+
+    for (let i = 0; i < n; i++) {
+      const id = identity[i]!;
+      // Mono-coloured only: a guild card sits between two arms by construction,
+      // so including it would drag both of their means toward each other.
+      let slot = -1;
+      for (let k = 0; k < 5; k++) {
+        if (id === COLOR_BIT[letters[k]!]) { slot = k; break; }
+      }
+      if (slot < 0) continue;
+      const o = i * 3;
+      const x = pos[o]!;
+      const z = pos[o + 2]!;
+      const r = Math.hypot(x, z);
+      if (r < 1e-3) continue;
+      // Unit vectors: a raw centroid is dominated by the rim, and the rim of a
+      // spiral is exactly where the twist has swung furthest from the mean.
+      sx[slot]! += x / r;
+      sz[slot]! += z / r;
+      count[slot]!++;
+    }
+
+    const next = { ...store.state.armAngles };
+    let changed = false;
+    for (let k = 0; k < 5; k++) {
+      const c = count[k]!;
+      if (c === 0) continue;
+      const mx = sx[k]! / c;
+      const mz = sz[k]! / c;
+      // Mean resultant length. Below this the colour is spread right around
+      // the layout and has no direction worth flying to.
+      if (Math.hypot(mx, mz) < 0.15) continue;
+      const letter = letters[k]!;
+      const angle = Math.atan2(mz, mx);
+      if (Math.abs(angle - next[letter]) > 1e-4) changed = true;
+      next[letter] = angle;
+    }
+    if (changed) store.set('armAngles', next);
+  }
+
   private consumeCue(cue: CameraCue | null): void {
     if (!cue) return;
     if (cue.kind === 'skip-cinematic') {
@@ -498,8 +568,11 @@ export class App {
       this.rig.playCinematic(this.framedDistance(), this.starfield.framePhi(), 45);
       store.set('cinematic', true);
     } else if (cue.kind === 'arm') {
-      const world = COLOR_ANGLE[COLOR_BIT[cue.color]] ?? 0;
-      this.rig.playArmFlight(world, this.framedDistance(), this.starfield.framePhi());
+      const world = store.state.armAngles[cue.color] ?? COLOR_ANGLE[COLOR_BIT[cue.color]] ?? 0;
+      // Closer than the framed view, and never further out than where they
+      // already are: clicking the pie is "show me this colour", not "reset".
+      const near = Math.min(this.rig.distance, this.framedDistance() * ARM_FLIGHT_FRACTION);
+      this.rig.playArmFlight(world, near, this.starfield.framePhi());
     }
     store.set('cameraCue', null);
   }

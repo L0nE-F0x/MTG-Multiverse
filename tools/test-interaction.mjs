@@ -577,15 +577,69 @@ try {
   const armFlying = await page.evaluate(() => window.__mcu.app.rig.isCinematic);
   check('a colour-pie click starts an arm flight', armFlying === true);
   await sleep(2400);
+  /*
+   * Asserted against where blue's cards *are*, not against blue's pentagon
+   * angle. This check used to hard-code `PI/2 - 2*TAU/5` and so encoded the
+   * bug it was meant to catch: the galaxy's arms are a spiral, every arm ends
+   * up ~117 degrees around from its base angle, and clicking blue on the pie
+   * flew you to green. Measuring the mean direction here means the check
+   * still means something in a layout that spaces its colours differently.
+   */
   const armSettled = await page.evaluate(() => {
-    const dest = Math.PI / 2 - (Math.PI * 2) / 5;
-    const h = window.__mcu.app.rig.heading;
-    const err = Math.abs(Math.atan2(Math.sin(h - dest), Math.cos(h - dest)));
-    return { cinematic: window.__mcu.app.rig.isCinematic, err };
+    const { app, universe } = window.__mcu;
+    const pos = app.starfield.positionBuffers.b;
+    const identity = universe.col.colorIdentity;
+    const BIT = { W: 1, U: 2, B: 4, R: 8, G: 16 };
+    const dir = {};
+    for (const [letter, bit] of Object.entries(BIT)) {
+      let sx = 0, sz = 0, n = 0;
+      for (let i = 0; i < universe.count; i++) {
+        if (identity[i] !== bit) continue;
+        const o = i * 3, x = pos[o], z = pos[o + 2];
+        const r = Math.hypot(x, z);
+        if (r < 1e-3) continue;
+        sx += x / r; sz += z / r; n++;
+      }
+      dir[letter] = Math.atan2(sz / n, sx / n);
+    }
+    const cam = app.rig.camera.position;
+    const camAngle = Math.atan2(cam.z, cam.x);
+    const off = (a) => Math.abs(Math.atan2(Math.sin(a - camAngle), Math.cos(a - camAngle)));
+    const nearest = Object.keys(dir).sort((a, b) => off(dir[a]) - off(dir[b]))[0];
+    return {
+      cinematic: app.rig.isCinematic,
+      err: off(dir.U),
+      nearest,
+      radius: app.rig.distance,
+      framed: app.starfield.frameDistance(),
+    };
   });
-  check('the arm flight settles looking at blue',
-    armSettled.cinematic === false && armSettled.err < 0.18,
-    `cinematic=${armSettled.cinematic} err=${armSettled.err.toFixed(3)}`);
+  check('the arm flight settles with blue on the near side',
+    armSettled.cinematic === false && armSettled.nearest === 'U' && armSettled.err < 0.25,
+    `cinematic=${armSettled.cinematic} nearest=${armSettled.nearest} err=${armSettled.err.toFixed(3)}`);
+  check('the arm flight closes the distance rather than reframing',
+    armSettled.radius < armSettled.framed * 0.8,
+    `radius=${armSettled.radius.toFixed(0)} framed=${armSettled.framed.toFixed(0)}`);
+
+  // The dial has to agree with where the flight put you, or it is a compass
+  // pointing at the wrong colour — which is what it was while the wedges were
+  // drawn on the pentagon angles and the camera aimed at the measured ones.
+  const needleOnBlue = await page.evaluate(() => {
+    const svg = document.querySelector('.mcu-minimap svg');
+    const needle = svg.querySelector('.mcu-minimap-needle');
+    const m = needle.getAttribute('transform').match(/rotate\(([-0-9.]+)\)/);
+    const deg = Number(m[1]);
+    const a = (deg * Math.PI) / 180;
+    // Walk in from the needle tip to a radius the wedges actually occupy.
+    const pt = svg.createSVGPoint();
+    pt.x = Math.cos(a) * 0.72;
+    pt.y = Math.sin(a) * 0.72;
+    const screen = pt.matrixTransform(svg.getScreenCTM());
+    const hit = document.elementFromPoint(screen.x, screen.y);
+    return hit?.closest?.('[data-arm]')?.getAttribute('data-arm') ?? null;
+  });
+  check('the compass tick lands on the wedge that was clicked',
+    needleOnBlue === 'U', `needle over ${needleOnBlue}`);
 
   const focusOn = await page.evaluate(() => {
     const i = window.__mcu.universe.search('Sol Ring', 1)[0];

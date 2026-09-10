@@ -123,15 +123,44 @@
 }
 
 @media (max-width: 900px) {
-  .mcu-search,
+  /*
+   * Third slot of the top row: it fills whatever the wordmark card on the left
+   * and the settings button on the right leave, both of which measure
+   * themselves (`--mcu-topbar-left` from hud.ts, `--mcu-topbar-right` from
+   * settings.ts) because neither is a constant width. Search used to be a
+   * full-width second row at a hard-coded top offset, which cost about 150px
+   * of galaxy on a phone and needed re-tuning every time either neighbour
+   * changed size.
+   */
+  .mcu-search {
+    /* Centred on the row's height — see the matching rule in settings.css. */
+    top: calc(10px + var(--mcu-safe-top) + (var(--mcu-topbar-h, 46px) - 38px) / 2);
+    left: calc(var(--mcu-topbar-left, 150px) + var(--mcu-safe-left) + 8px);
+    right: calc(var(--mcu-topbar-right, 48px) + var(--mcu-safe-right) + 8px);
+    width: auto;
+    transition:
+      left 240ms var(--mcu-ease),
+      right 240ms var(--mcu-ease);
+  }
+  /*
+   * In use it takes the whole row. A ~200px field is enough to see what you
+   * typed and not enough to read a result list; the two things it covers are
+   * hidden by `.mcu-root--searching` (see base.css).
+   */
   .mcu-search:focus-within,
   .mcu-search--open {
-    top: var(--mcu-mobile-search-top);
-    left: 10px;
-    right: 10px;
+    left: calc(10px + var(--mcu-safe-left));
+    right: calc(10px + var(--mcu-safe-right));
     width: auto;
   }
   /* 16px stops iOS Safari auto-zooming the page on focus. */
-  .mcu-search-input { font-size: 16px; min-height: var(--mcu-touch); }
+  .mcu-search-input {
+    font-size: 16px;
+    min-height: 38px;
+    padding: 8px 12px 8px 30px;
+    border-radius: 9px;
+  }
+  .mcu-search-icon { left: 10px; }
   .mcu-search-row { padding: 12px 14px; min-height: var(--mcu-touch); }
+  .mcu-search-results { max-height: 46vh; }
 }

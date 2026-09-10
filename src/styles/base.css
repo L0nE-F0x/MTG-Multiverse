@@ -43,6 +43,19 @@
   inset: 0;
   z-index: 20;
   pointer-events: none;
+  /*
+   * Safe-area insets, expressed in the layout pixels this subtree is laid out
+   * in. `scale.ts` puts `zoom` on this element, which multiplies every length
+   * below it, so a raw `env()` would reach the screen scaled down and the top
+   * chrome would sit under an iPhone's status bar — visible only in a
+   * standalone install, where `black-translucent` is what puts the page under
+   * the clock in the first place. On Android in real fullscreen these are all
+   * zero and nothing here costs anything.
+   */
+  --mcu-safe-top: calc(env(safe-area-inset-top, 0px) * var(--mcu-ui-inv, 1));
+  --mcu-safe-bottom: calc(env(safe-area-inset-bottom, 0px) * var(--mcu-ui-inv, 1));
+  --mcu-safe-left: calc(env(safe-area-inset-left, 0px) * var(--mcu-ui-inv, 1));
+  --mcu-safe-right: calc(env(safe-area-inset-right, 0px) * var(--mcu-ui-inv, 1));
   font-family: var(--mcu-font);
   color: var(--mcu-text);
   font-size: 13px;
@@ -318,13 +331,41 @@
  * Shared chip/segmented/checkbox chrome grows to a real >=44px hit area
  * below the tablet breakpoint; everything else stays visually compact. */
 @media (max-width: 900px) {
-  /* Command bar is ~88px tall once the about control is a 44px hit target,
-     so search sits below it and the side panels sit below search. Magic
-     numbers here used to leave search overlapping the wordmark. */
-  :root {
-    --mcu-mobile-search-top: 96px;
-    --mcu-mobile-panel-top: 158px;
-    --mcu-mobile-panel-bottom: 76px;
+  /*
+   * One top row on a phone: wordmark card, search, settings, all on the same
+   * line. Search used to be a second full-width row under an 88px-tall command
+   * bar, which cost 150px of galaxy before anything else was drawn.
+   *
+   * `--mcu-topbar-h` is published by `hud.ts` from the command bar it actually
+   * measured, so the side panels clear the row whatever the row turns out to
+   * be. It is declared here rather than on `:root` because it is written on
+   * `.mcu-root`, and a custom property resolves its own `var()`s against the
+   * element it is declared on.
+   */
+  .mcu-root {
+    --mcu-mobile-panel-top: calc(var(--mcu-topbar-h, 46px) + var(--mcu-safe-top) + 20px);
+    --mcu-mobile-panel-bottom: calc(var(--mcu-hud-bottom, 96px) + var(--mcu-safe-bottom) + 10px);
+  }
+
+  /*
+   * Search takes the whole row while it is being used. The two things it
+   * covers are hidden rather than left to show through: the input is a
+   * translucent panel, and a wordmark reading through a search field looks
+   * like a rendering fault. `search.ts` owns the class.
+   */
+  .mcu-root--searching .mcu-command-bar,
+  .mcu-root--searching .mcu-settings-toggle {
+    /*
+     * `visibility`, not `opacity`. Both of these arrive on `mcu-panel-in` with
+     * `animation-fill-mode: both`, and an animation's own value beats every
+     * normal author declaration for the properties it animates — opacity is
+     * one of them, so an `opacity: 0` here changed nothing and the wordmark
+     * read straight through the search field. `visibility` is not in those
+     * keyframes, so it is decided by the ordinary cascade. The same reason
+     * `.mcu-root--title` above sets `animation: none` before its opacity.
+     */
+    visibility: hidden;
+    pointer-events: none;
   }
   .mcu-toggle-chip {
     padding: 11px 12px;

@@ -99,6 +99,13 @@ re-running `data:build` — the loader refuses a mismatched version on purpose.
   invisible for a long time because `autoRotate` defaults to true and the
   camera never stops; turn it off (a persisted checkbox) and the nebula toggle,
   the intensity slider and the filter-driven density all went dead.
+- **A decorative pseudo-element still hit-tests.** The card panel's close
+  button was dead on every viewport for a long time: `.mcu-card-image-frame`
+  is positioned and comes *after* the button in the DOM, and its `::before`
+  glow reaches `-20%` past every edge, which is most of the panel's top strip.
+  It looked completely normal in a screenshot. Anything decorative that
+  overhangs its box needs `pointer-events: none`, and anything that must stay
+  clickable underneath a later positioned sibling needs a `z-index`.
 - **A translucent background cannot mask scrolled content.** The intro's sticky
   CTA used `var(--mcu-panel-bg)` (0.78 alpha) and the controls list showed
   straight through it. Anything that has to occlude needs a near-opaque colour,
@@ -188,6 +195,75 @@ secure context, and localhost counts) and reading
 `Page.getInstallabilityErrors` over CDP — an empty list plus a
 `beforeinstallprompt` event is the actual verdict. Check the root case in the
 same run; the two resolve differently and only one of them is what you edited.
+
+## The phone is one row at the top and one bar at the bottom
+
+Under 900px the chrome collapses to two strips and the whole middle is galaxy.
+Three of those pieces measure themselves and publish the result, because none
+of them is a constant width and every hard-coded number here has been wrong at
+least once:
+
+- **`--mcu-topbar-left`** (`hud.ts`) is the right edge of the wordmark card,
+  **`--mcu-topbar-right`** (`settings.ts`) is the left edge of the settings
+  button, and search fills what is between them. It used to be a full-width
+  second row at a fixed `top`, which cost ~150px of sky.
+- **`--mcu-topbar-h`** is that row's height, and `--mcu-mobile-panel-top` is
+  derived from it, so the filter, settings and card panels clear the row
+  whatever it turns out to be.
+- **`--mcu-hud-bottom`** already existed for the skip pill; the compass now
+  floats above it too, because the layout switcher spans the full width on a
+  phone and a constant `bottom: 76px` put the compass on the format row.
+
+Two traps in that strip, both of which cost an hour:
+
+- **`opacity` cannot hide anything that arrived on an animation.** Every panel
+  enters on `mcu-panel-in` with `animation-fill-mode: both`, and an animation's
+  value for a property it animates beats every normal author declaration. So
+  `.mcu-root--searching` hides the wordmark with `visibility`, which is not in
+  those keyframes. `.mcu-root--title` gets away with `opacity` only because it
+  sets `animation: none` first.
+- **`--mcu-inset-right` is a desktop idea.** It is the card panel's footprint,
+  and dodging it is right when that panel is full height. On a phone the card
+  panel is a floating card *below* the top row, so subtracting its ~340px slid
+  the settings button underneath the wordmark.
+
+Safe-area insets reach the UI as `--mcu-safe-*`, which are `env()` multiplied
+by `--mcu-ui-inv` — `scale.ts` puts `zoom` on the root, and `zoom` scales
+`env()` along with everything else, so a raw inset lands 15% short of the notch.
+
+**Fullscreen is asked for at runtime, not declared in the manifest.**
+`display: fullscreen` would apply to the desktop install too, where opening an
+app over the whole screen is hostile, and `display_override` is honoured by
+exactly the browsers that would do the same. `ui/fullscreen.ts` requests it
+from the title screen's Enter handler instead — the one tap every visit already
+makes, and `requestFullscreen` needs a live gesture — gated on a coarse
+pointer, at most once per page load so a deliberate exit is not undone, with a
+Settings checkbox that reads and writes the real document state. iPhones have
+no element fullscreen at all; there the `black-translucent` status bar style
+plus those safe-area tokens are the whole story.
+
+## The compass points at where the colours are, not where they were seeded
+
+`store.armAngles` is the circular mean of each colour's mono-coloured cards,
+measured from the *target* position buffer by `App.measureArmAngles()` on every
+layout change. It is not `COLOR_ANGLE`.
+
+`COLOR_ANGLE` is an arm's base angle at the dead centre of the disc, and
+`galaxy()` adds `radius * TWIST` on top of it. Across the radii that actually
+hold cards that is about 117 degrees — nearly two of the five wedges — so a
+camera aimed at the base angle put Red on the near side when you clicked White,
+and the pie's own wedges named the wrong colour for the same reason. The mean
+resultant length is ~0.80 in the galaxy, which is what makes the mean
+meaningful; below 0.15 the colour has no direction (the rarity shells) and the
+pentagon is kept as the fallback.
+
+The dial is now a plain top-down view of the world — SVG +x is world +x, SVG +y
+is world +z, no CSS rotation and no counter-rotated letters — so the heading
+tick is the camera's own XZ angle (`π/2 - θ`, the same expression the flight
+inverts) rather than that angle plus a constant nobody could check. An arm
+flight also settles at 60% of the framed distance and never further out than
+where you already were: clicking the pie means "show me this colour", not
+"reset the view".
 
 ## The UI tells the renderer what it is covering
 

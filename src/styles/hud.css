@@ -80,6 +80,11 @@
   color: var(--mcu-cyan);
   font-weight: 600;
 }
+.mcu-command-count-sep,
+.mcu-command-count-unit {
+  color: var(--mcu-text-dim);
+  font-weight: 400;
+}
 
 /*
  * Outer element owns fixed positioning + horizontal centring via the
@@ -177,15 +182,44 @@
 }
 
 @media (max-width: 900px) {
-  .mcu-command-bar { top: 10px; left: 10px; padding: 8px 12px; max-width: calc(100vw - 20px); }
-  .mcu-wordmark { font-size: 11px; }
-  .mcu-about-btn { width: var(--mcu-touch); height: var(--mcu-touch); font-size: 13px; }
+  /*
+   * The wordmark card is one third of a single top row, so it is sized to its
+   * content and nothing else: tight padding, a small circular help control,
+   * and the count in its compact form (see `paintCount`). It used to be an
+   * ~88px-tall slab whose width was set by "111,720 of 117,621 stars visible".
+   */
+  .mcu-command-bar {
+    top: calc(10px + var(--mcu-safe-top));
+    left: calc(10px + var(--mcu-safe-left));
+    padding: 6px 10px;
+    gap: 1px;
+    border-radius: 9px;
+  }
+  .mcu-command-bar-top { gap: 8px; }
+  .mcu-wordmark { font-size: 9.5px; letter-spacing: 0.18em; }
+  .mcu-command-count { font-size: 9.5px; white-space: nowrap; }
+  /*
+   * A 26px dot with a 44px hit area. Sizing the *element* to the touch target
+   * made it the tallest thing in the card and set the height of the whole top
+   * row; the hit area does not have to be the thing you can see.
+   */
+  .mcu-about-btn {
+    width: 26px;
+    height: 26px;
+    font-size: 12px;
+    position: relative;
+  }
+  .mcu-about-btn::before {
+    content: '';
+    position: absolute;
+    inset: -9px;
+    border-radius: 50%;
+  }
   .mcu-layout-desc { display: none; }
   /* No flex-wrap here: these are flex-shrink children with wrapping text
      (see .mcu-layout-btn below), so the row compresses to fit instead of
      spilling to a second line — wrapping the row itself let each button
      re-expand to its unwrapped single-line width and defeated that. */
-  .mcu-layout-segmented { max-width: calc(100vw - var(--mcu-inset-left, 0px) - var(--mcu-inset-right, 0px) - 20px); }
   .mcu-layout-btn {
     padding: 6px 6px;
     font-size: 9px;
@@ -198,7 +232,24 @@
     justify-content: center;
     text-align: center;
   }
-  .mcu-layout-switcher { bottom: 10px; max-width: calc(100vw - var(--mcu-inset-left, 0px) - var(--mcu-inset-right, 0px) - 20px); }
+  /*
+   * Anchored to both edges rather than centred on the free area. On a phone
+   * the filter panel is a floating card that stops well above this bar, so
+   * the left inset it publishes is only the collapsed tab in the middle of
+   * the screen — and shifting the bar by half of that pushed "Price" off the
+   * right edge and parked the whole row under the colour compass. Both edges
+   * pinned means centred by construction, at every width, and the six buttons
+   * share the full width instead of a fraction of it.
+   */
+  .mcu-layout-switcher {
+    bottom: calc(10px + var(--mcu-safe-bottom));
+    left: calc(10px + var(--mcu-safe-left));
+    right: calc(10px + var(--mcu-safe-right));
+    translate: none;
+    max-width: none;
+  }
+  .mcu-layout-switcher-inner { width: 100%; }
+  .mcu-layout-segmented { width: 100%; max-width: none; }
 }
 
 /* ---- Glass pass -------------------------------------------------------

@@ -65,6 +65,13 @@ export function connectUiScale(root: HTMLElement, onChange: () => void): () => v
     if (Math.abs(next - current) < 0.001) return;
     current = next;
     root.style.setProperty('--mcu-ui-scale', String(next));
+    // The reciprocal, for the one thing that has to *undo* the zoom: safe-area
+    // insets. `env()` is viewport CSS pixels, but every length inside this
+    // subtree is multiplied by the scale on its way to the screen, so an inset
+    // written raw comes out 15% short and the top chrome creeps back under the
+    // notch. Multiplying is deliberate — `calc(… / var(…))` is the obvious
+    // spelling and the less portable one.
+    root.style.setProperty('--mcu-ui-inv', String(1 / next));
     // Exactly 1 leaves no zoom in the tree at all, which keeps the common case
     // free of any coordinate-space subtlety.
     root.style.zoom = next === 1 ? '' : String(next);
@@ -76,6 +83,7 @@ export function connectUiScale(root: HTMLElement, onChange: () => void): () => v
   return () => {
     window.removeEventListener('resize', apply);
     root.style.removeProperty('--mcu-ui-scale');
+    root.style.removeProperty('--mcu-ui-inv');
     root.style.zoom = '';
     current = 1;
   };

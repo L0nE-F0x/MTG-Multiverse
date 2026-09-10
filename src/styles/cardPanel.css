@@ -23,6 +23,12 @@
   position: absolute;
   top: 14px;
   right: 14px;
+  /* Above the card image's glow. That glow is a ::before with `inset: -20%`
+     on a frame that is itself positioned and later in the DOM, so it painted
+     *and hit-tested* over this button — the close control was dead on every
+     viewport while looking perfectly normal. The glow opts out of hit-testing
+     below; this is the belt to that pair of braces. */
+  z-index: 5;
   width: 24px;
   height: 24px;
   border-radius: 6px;
@@ -50,6 +56,9 @@
   content: '';
   position: absolute;
   inset: -20%;
+  /* Decoration only. It reaches a fifth of the card's height past every edge,
+     which is most of the panel's top strip. */
+  pointer-events: none;
   background: radial-gradient(circle, var(--glow-1, #5ee7ff) 0%, var(--glow-2, #a56bff) 45%, transparent 72%);
   filter: blur(28px);
   opacity: 0.45;

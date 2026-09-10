@@ -13,6 +13,50 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 # ▶ START HERE — next session
 
+**2026-09-11 — phone layout, the colour compass, and the card panel's close
+button.** Interaction suite 69/69 (two new checks; one rewritten).
+
+Six things, all shipped:
+
+1. **True fullscreen on a phone.** `src/ui/fullscreen.ts`. The manifest stays
+   `standalone` on purpose — `display: fullscreen` would apply to the desktop
+   install too — so fullscreen is requested at runtime from the title screen's
+   Enter handler, which is the one live user gesture the play path is
+   guaranteed to have. Coarse pointers only, once per page load, plus a
+   Settings checkbox bound to the real document state. iOS has no element
+   fullscreen; safe-area tokens cover it there instead.
+2. **One top row.** Wordmark card, search, settings button, all on the same
+   line under 900px. The card is compact (the count reads `111,720 / 117,621`),
+   the settings button is a sliders glyph, and search fills the gap between
+   the two using widths they publish themselves. Focus expands search to the
+   whole row and hides its neighbours.
+3. **The bottom bar is centred and full width.** It was offset by half the
+   collapsed filter tab's footprint, which pushed "Price" to the edge and put
+   the row under the compass. Both edges pinned now; the compass floats above
+   `--mcu-hud-bottom`.
+4. **Safe-area insets**, as `--mcu-safe-*`, divided out of the UI zoom.
+5. **The card panel's close button works.** It was covered by the card image's
+   glow — a `::before` with `inset: -20%` on a positioned later sibling. It
+   hit-tested over the button on every viewport and looked perfectly fine in
+   a screenshot.
+6. **The colour pie flies to the right colour.** It was aiming at
+   `COLOR_ANGLE`, the arm's base angle at the centre of the disc; the spiral
+   adds ~117 degrees across the populated radii, so clicking White arrived at
+   Red. `store.armAngles` now carries the measured circular mean per colour,
+   the wedges are drawn on it, the dial dropped its CSS rotation so the
+   heading tick is the camera's own angle, and a flight comes in to 60% of the
+   framed distance instead of reframing the whole galaxy.
+
+Both bugs and the layout are covered by the suite: the arm-flight check used
+to hard-code the pentagon angle and so asserted the bug, and now measures
+where blue actually is, checks the distance closed, and checks the tick lands
+on the wedge that was clicked.
+
+One standing caveat, unchanged: a run with the desktop browser open loses the
+nine pointer checks as a block. That is contention, not code. Three clean runs
+back to back once the box was quiet.
+
+
 **2026-09-10 later — skip-intro placement, and the host copy is installable.**
 
 Three things, all shipped:
