@@ -313,3 +313,29 @@
     font-size: 13px;
   }
 }
+
+/* ---- Arrival ----------------------------------------------------------
+ * The panel slides in as a slab. Walking its blocks in behind the slide makes
+ * opening a card feel like the panel is being filled rather than flown in
+ * already finished, and it costs nothing: every delay lands inside the 460ms
+ * the slide itself takes. */
+.mcu-card-panel--open .mcu-card-image-frame,
+.mcu-card-panel--open .mcu-card-pips,
+.mcu-card-panel--open .mcu-card-info,
+.mcu-card-panel--open .mcu-card-oracle,
+.mcu-card-panel--open .mcu-card-link {
+  animation: mcu-rise-in 420ms var(--mcu-ease) both;
+}
+.mcu-card-panel--open .mcu-card-image-frame { animation-delay: calc(var(--mcu-stagger) * 1.5); }
+.mcu-card-panel--open .mcu-card-pips { animation-delay: calc(var(--mcu-stagger) * 2.5); }
+.mcu-card-panel--open .mcu-card-info { animation-delay: calc(var(--mcu-stagger) * 3); }
+.mcu-card-panel--open .mcu-card-oracle { animation-delay: calc(var(--mcu-stagger) * 4); }
+.mcu-card-panel--open .mcu-card-link { animation-delay: calc(var(--mcu-stagger) * 5); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mcu-card-panel--open .mcu-card-image-frame,
+  .mcu-card-panel--open .mcu-card-pips,
+  .mcu-card-panel--open .mcu-card-info,
+  .mcu-card-panel--open .mcu-card-oracle,
+  .mcu-card-panel--open .mcu-card-link { animation: none; }
+}

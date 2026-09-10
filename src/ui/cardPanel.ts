@@ -9,7 +9,7 @@ import { FORMAT_BIT } from '../data/format.ts';
 import type { Universe } from '../data/universe.ts';
 import { capitalize, el, fmtInt, listen } from './dom.ts';
 import { uiScale } from './scale.ts';
-import { MANA_COLOR_HEX } from './theme.ts';
+import { MANA_COLOR_HEX, MANA_UI_HEX } from './theme.ts';
 import '../styles/cardPanel.css';
 
 export interface CardPanelHandle {
@@ -223,7 +223,7 @@ export function mountCardPanel(root: HTMLElement, universe: Universe): CardPanel
     if (colors.length) {
       for (const c of colors) {
         const pip = el('span', { className: 'mcu-pip' });
-        pip.style.setProperty('--pip-color', MANA_COLOR_HEX[c] ?? '#888');
+        pip.style.setProperty('--pip-color', MANA_UI_HEX[c] ?? '#888');
         pipsRow.append(pip);
       }
     } else {

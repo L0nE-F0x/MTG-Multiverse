@@ -6,6 +6,7 @@ precision highp sampler2D;
 
 uniform vec3      uCamPos;
 uniform float     uTime;
+uniform float     uFrame;
 uniform float     uIntensity;
 uniform float     uSteps;
 uniform float     uNoiseScale;
@@ -81,12 +82,36 @@ float ridgedFbm(vec3 p) {
   return sum;
 }
 
+/**
+ * Two scales of structure, plus the mist between them.
+ *
+ * `n` is the ridged crest — the filament proper. `macro` is the slow field that
+ * decides which regions of the disc have any gas at all. `veil` is the third
+ * term and the one that makes this read as a nebula rather than a set of
+ * threads: a broad, low-amplitude haze that fills the space the filaments leave.
+ *
+ * Without it the gate is the only thing writing density, and a gate is binary
+ * by nature — every sample is either near zero or near the crest value, which
+ * is what made the volume so unforgiving of the step jitter. Carrying a soft
+ * floor means neighbouring rays disagree by far less, so the same number of
+ * steps produces a much quieter image before any denoise runs at all.
+ */
 float filament(vec3 p) {
   vec3 q = p * uNoiseScale + vec3(uTime * 0.0021, uTime * 0.0035, -uTime * 0.0016);
   q += warpOf(q * 0.62) * uWarp;
-  float n = smoothstep(0.62, 0.86, ridgedFbm(q));
-  float macro = smoothstep(0.32, 0.74, n1(p * (uNoiseScale * 0.26) + 4.1));
-  return n * macro;
+  float n = smoothstep(0.60, 0.87, ridgedFbm(q));
+  float macro = smoothstep(0.30, 0.75, n1(p * (uNoiseScale * 0.26) + 4.1));
+  // Single fetch, not `fbm`. The veil wants to be broad and featureless, so
+  // four octaves buy it nothing — and this runs on every step of every ray, so
+  // the three extra texture reads cost about half the march again. That is not
+  // a frame or two: it dragged the adaptive ladder to its floor, and the first
+  // thing to break at that frame rate was the pointer, not the picture.
+  float veil = smoothstep(0.30, 0.74, n1(q * 0.5 + 2.7));
+  // Gated by `macro`, never added flat. A flat floor fills the inter-arm void
+  // as readily as the arms, and the dark between WUBRG is most of what makes
+  // the spiral legible — the first attempt at this turned the whole frame into
+  // one pale wash.
+  return n * macro + veil * macro * 0.055;
 }
 
 // Galaxy / price: five-arm spiral. Dust lanes are the point — a 5.2 power
@@ -214,8 +239,12 @@ void main() {
     if (tMax > tMin) {
       float steps = uSteps;
       float dt = (tMax - tMin) / steps;
-      // Stable in time: hashing uTime here made the volume sparkle every frame.
-      float jitter = hash12(gl_FragCoord.xy);
+      // Advances one golden-ratio turn per frame. Freezing this was the right
+      // call when a frame was shown on its own — the dither sparkled — but the
+      // volume now accumulates across frames, so a *moving* offset is exactly
+      // what averages the step error out. A still camera converges in about a
+      // dozen frames and then stops marching.
+      float jitter = fract(hash12(gl_FragCoord.xy) + uFrame * 0.6180339887);
       float t = tMin + dt * jitter;
 
       vec3 accum = vec3(0.0);
@@ -230,7 +259,7 @@ void main() {
         float d = densityAt(p, tint);
         if (d > 0.001) {
           float nearFade = smoothstep(0.0, fadeDist, t);
-          float sigma = d * dt * 0.082 * nearFade;
+          float sigma = d * dt * 0.074 * nearFade;
           float rr = length(p);
           vec3 emit = tint * (0.55 + 0.45 * exp(-rr / 160.0));
           // Nucleus white is galaxy-sized, not layout-sized — scaling it with

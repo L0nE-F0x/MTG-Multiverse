@@ -7,6 +7,7 @@ uniform float uStarSize;
 uniform float uDim;          // brightness floor for filtered-out stars
 uniform float uSizeScale;    // (viewportHeight * 0.5) / tan(fov/2)
 uniform float uMinPixels;
+uniform float uDepthScale;   // bounding radius of the current layout
 uniform float uHovered;
 uniform float uSelected;
 uniform float uTwinkle;
@@ -78,6 +79,12 @@ void main() {
   bright *= 1.0 + uTwinkle * 0.22 * sin(uTime * 1.5 + aSeed * 240.0);
 
   float wanted = size * uSizeScale / dist;
+  // The floor is deliberately above one pixel. At 1.05 a distant star lit
+  // exactly one pixel with a hard edge, so the far side of the disc resolved
+  // into a field of separate dots that crawled as the camera turned. A sprite
+  // wide enough to carry the fragment shader's gaussian lands as a soft blob
+  // instead, and a hundred thousand soft blobs are the mist this is supposed
+  // to be. Energy conservation below pays for the extra area.
   float clamped = max(wanted, uMinPixels);
 
   // Energy conservation: once a star is clamped up to the minimum readable
@@ -123,9 +130,17 @@ void main() {
 
   gl_PointSize = min(clamped, 220.0);
 
+  // Atmospheric perspective. There is genuinely dust between here and the far
+  // rim, and losing a little saturation and contrast into the ambient over that
+  // distance is what separates the near edge of the disc from the far one. With
+  // every star graded identically the disc reads as a flat cut-out, because
+  // size alone is not a strong enough depth cue against an additive field.
+  float depth = clamp(dist / (uDepthScale * 2.7), 0.0, 1.0);
+  bright *= 1.0 - depth * 0.20;
+
   // Only genuinely bright stars earn diffraction spikes; on everything else
   // they turn the field into a cross-hatch.
   vSpike = smoothstep(2.4, 7.0, wanted) * smoothstep(0.55, 1.6, aBright);
-  vColor = aColor;
+  vColor = mix(aColor, vec3(0.56, 0.64, 0.86), depth * 0.30);
   vBright = bright * uExposure;
 }

@@ -9,14 +9,15 @@ import { store, type LayoutMode } from '../core/store.ts';
 import { COLOR_BIT, type ColorLetter } from '../data/format.ts';
 import { COLOR_ANGLE } from '../layout/layouts.ts';
 import { el, listen } from './dom.ts';
+import { MANA_UI_HEX } from './theme.ts';
 import '../styles/minimap.css';
 
 const ARMS: { letter: ColorLetter; label: string; fill: string }[] = [
-  { letter: 'W', label: 'White', fill: '#f3e2a0' },
-  { letter: 'U', label: 'Blue', fill: '#4aa8ff' },
-  { letter: 'B', label: 'Black', fill: '#9a6ae8' },
-  { letter: 'R', label: 'Red', fill: '#ff5a3c' },
-  { letter: 'G', label: 'Green', fill: '#3dce74' },
+  { letter: 'W', label: 'White', fill: MANA_UI_HEX.W! },
+  { letter: 'U', label: 'Blue', fill: MANA_UI_HEX.U! },
+  { letter: 'B', label: 'Black', fill: MANA_UI_HEX.B! },
+  { letter: 'R', label: 'Red', fill: MANA_UI_HEX.R! },
+  { letter: 'G', label: 'Green', fill: MANA_UI_HEX.G! },
 ];
 
 /** Layouts where colour identity is still a spatial axis. */

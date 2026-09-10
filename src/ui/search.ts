@@ -6,7 +6,7 @@
 import { store } from '../core/store.ts';
 import type { Universe } from '../data/universe.ts';
 import { debounce, el, listen } from './dom.ts';
-import { MANA_COLOR_HEX } from './theme.ts';
+import { MANA_UI_HEX } from './theme.ts';
 import '../styles/search.css';
 
 export interface SearchHandle {
@@ -92,7 +92,7 @@ export function mountSearch(root: HTMLElement, universe: Universe): SearchHandle
       const pips = el('div', { className: 'mcu-search-pips' });
       for (const c of universe.colorLetters(idx)) {
         const pip = el('span', { className: 'mcu-pip' });
-        pip.style.setProperty('--pip-color', MANA_COLOR_HEX[c] ?? '#888');
+        pip.style.setProperty('--pip-color', MANA_UI_HEX[c] ?? '#888');
         pips.append(pip);
       }
       const row = el(

@@ -15,7 +15,7 @@ import {
   DISCLAIMER,
 } from './brand.ts';
 import { el, fmtInt, listen } from './dom.ts';
-import { MANA_COLOR_HEX } from './theme.ts';
+import { MANA_UI_HEX } from './theme.ts';
 import '../styles/title.css';
 
 export interface TitleHandle {
@@ -39,7 +39,7 @@ function manaPips(className: string): HTMLElement {
   const row = el('div', { className });
   for (const c of ['W', 'U', 'B', 'R', 'G'] as const) {
     const pip = el('span', { className: 'mcu-title-pip' });
-    const hex = MANA_COLOR_HEX[c] ?? '#888';
+    const hex = MANA_UI_HEX[c] ?? '#888';
     pip.style.background = hex;
     pip.style.color = hex;
     row.append(pip);

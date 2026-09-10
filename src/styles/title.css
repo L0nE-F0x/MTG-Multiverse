@@ -272,3 +272,152 @@
   .mcu-title-mark { animation: none; }
   .mcu-title-wordmark { animation: none; }
 }
+
+/* ---- Look pass --------------------------------------------------------
+ * The landing screen is the first and often only impression, and it was doing
+ * three things that undercut it: a wordmark with no depth against a busy
+ * galaxy, two secondary buttons that read as a settings dialog, and every
+ * element arriving on the same frame. */
+
+/*
+ * Wordmark. The gradient is symmetric on purpose: the sweep parks it at an
+ * arbitrary phase whenever the screen is looked at, and an asymmetric ramp
+ * reads as broken at half of them — violet at one end and white at the other,
+ * as though the fill had failed. Mirroring makes every phase a coherent ramp.
+ */
+.mcu-title-wordmark {
+  background: linear-gradient(100deg, #ffffff 0%, var(--mcu-cyan) 26%, var(--mcu-violet) 50%, var(--mcu-cyan) 74%, #ffffff 100%);
+  background-size: 190% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: mcu-title-sheen 11s linear infinite, mcu-title-glow 3.6s ease-in-out infinite;
+}
+
+/* A wordmark this thin needs the galaxy pushed back behind it, not dimmed
+   everywhere. An elliptical scrim tied to the text block does that without
+   flattening the whole frame the way a full-screen dim would. */
+.mcu-title-center::before {
+  background: radial-gradient(
+    ellipse at 50% 46%,
+    rgba(4, 5, 11, 0.86) 0%,
+    rgba(4, 5, 11, 0.54) 32%,
+    rgba(4, 5, 11, 0.16) 54%,
+    rgba(4, 5, 11, 0) 70%
+  );
+}
+
+/* A ring, so five small dots read as a deliberate colour key rather than dust
+   on the screen. */
+.mcu-title-pip {
+  width: 9px;
+  height: 9px;
+  box-shadow: 0 0 10px currentColor, 0 0 0 1px rgba(255, 255, 255, 0.22);
+}
+
+.mcu-title-tagline { color: var(--mcu-text); opacity: 0.82; }
+
+/*
+ * Enter. The button is the doorway, so it gets an aperture: a sheen that
+ * crosses the face on a long cycle, on a pseudo-element so it cannot fight the
+ * hover transform on the button itself.
+ */
+.mcu-title-enter {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #8df2ff 0%, var(--mcu-cyan) 34%, var(--mcu-violet) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 0 28px rgba(94, 231, 255, 0.35),
+    0 10px 30px rgba(0, 0, 0, 0.5);
+  transition:
+    transform 220ms var(--mcu-ease-spring),
+    box-shadow 220ms var(--mcu-ease);
+}
+.mcu-title-enter::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 42%;
+  left: -60%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  animation: mcu-title-sweep 4.6s var(--mcu-ease) infinite;
+  pointer-events: none;
+}
+.mcu-title-enter:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 0 44px rgba(94, 231, 255, 0.55),
+    0 14px 34px rgba(0, 0, 0, 0.55);
+}
+
+/* Secondary actions, tinted toward the accent rather than neutral grey. Two
+   grey rectangles under a coloured primary is what made this look like an
+   operating-system dialog dropped on top of a galaxy. */
+.mcu-title-btn {
+  background:
+    linear-gradient(180deg, rgba(64, 96, 150, 0.42), rgba(12, 18, 38, 0.5)),
+    rgba(7, 10, 20, 0.55);
+  border-color: rgba(120, 190, 240, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(200, 232, 255, 0.22),
+    0 6px 22px rgba(0, 0, 0, 0.46);
+  transition:
+    color 180ms var(--mcu-ease),
+    border-color 180ms var(--mcu-ease),
+    box-shadow 180ms var(--mcu-ease),
+    transform 180ms var(--mcu-ease-spring);
+}
+.mcu-title-btn:hover { transform: translateY(-1px); }
+.mcu-title-btn:active { transform: translateY(0) scale(0.98); }
+
+/*
+ * Staggered arrival. `.mcu-title-center` already fades the block in as a
+ * whole; this walks its children in behind it, so the screen assembles — mark,
+ * wordmark, colour key, tagline, count, actions — instead of appearing.
+ */
+.mcu-title--open .mcu-title-mark,
+.mcu-title--open .mcu-title-pips,
+.mcu-title--open .mcu-title-tagline,
+.mcu-title--open .mcu-title-count,
+.mcu-title--open .mcu-title-actions {
+  animation: mcu-rise-in 620ms var(--mcu-ease) both;
+}
+.mcu-title--open .mcu-title-mark {
+  /* Keeps its own slow spin, so the mark lands and then stays alive. */
+  animation:
+    mcu-rise-in 620ms var(--mcu-ease) calc(var(--mcu-stagger) * 1) both,
+    mcu-title-spin 80s linear infinite;
+}
+.mcu-title--open .mcu-title-wordmark {
+  /* Same for the sheen and glow: the arrival is appended rather than
+     replacing them, or the wordmark lands and goes dead. */
+  animation:
+    mcu-rise-in 620ms var(--mcu-ease) calc(var(--mcu-stagger) * 2) both,
+    mcu-title-sheen 11s linear infinite,
+    mcu-title-glow 3.6s ease-in-out infinite;
+}
+.mcu-title--open .mcu-title-pips { animation-delay: calc(var(--mcu-stagger) * 4); }
+.mcu-title--open .mcu-title-tagline { animation-delay: calc(var(--mcu-stagger) * 5); }
+.mcu-title--open .mcu-title-count { animation-delay: calc(var(--mcu-stagger) * 6); }
+.mcu-title--open .mcu-title-actions { animation-delay: calc(var(--mcu-stagger) * 8); }
+
+@keyframes mcu-title-sheen {
+  from { background-position: 130% 0; }
+  to { background-position: -130% 0; }
+}
+@keyframes mcu-title-sweep {
+  0% { left: -60%; }
+  /* Long dead time: a sweep that runs continuously is a barber's pole. */
+  38%, 100% { left: 130%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mcu-title-enter::after { animation: none; opacity: 0; }
+  .mcu-title--open .mcu-title-mark,
+  .mcu-title--open .mcu-title-wordmark,
+  .mcu-title--open .mcu-title-pips,
+  .mcu-title--open .mcu-title-tagline,
+  .mcu-title--open .mcu-title-count,
+  .mcu-title--open .mcu-title-actions { animation: none; }
+}

@@ -13,6 +13,21 @@ const LAYOUT_ID: Record<LayoutMode, number> = {
   price: 5,
 };
 
+/**
+ * Frames of history the volume is allowed to converge over while the camera is
+ * at rest. Past this it stops marching entirely and the composite blits the
+ * settled image, which is what the old single-target cache did for every frame.
+ */
+const SETTLE_FRAMES = 14;
+
+const FULLSCREEN_VERT = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = vec4(position.xy, 1.0, 1.0);
+  }
+`;
+
 function dummyClusterMap(): THREE.DataTexture {
   const tex = new THREE.DataTexture(new Float32Array(4), 1, 1, THREE.RGBAFormat, THREE.FloatType);
   tex.needsUpdate = true;
@@ -20,6 +35,17 @@ function dummyClusterMap(): THREE.DataTexture {
   tex.magFilter = THREE.LinearFilter;
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
   return tex;
+}
+
+function lowResTarget(): THREE.WebGLRenderTarget {
+  return new THREE.WebGLRenderTarget(1, 1, {
+    format: THREE.RGBAFormat,
+    type: THREE.HalfFloatType,
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+    depthBuffer: false,
+    stencilBuffer: false,
+  });
 }
 
 /** Bake set-cluster Gaussians into an xz density map the raymarcher can sample. */
@@ -64,10 +90,26 @@ export function bakeClusterMap(centers: Float32Array, size = 128): { texture: TH
  * Raymarched volumetric background: interstellar gas plus the distant fixed
  * stars, in one pass.
  *
- * The march is the most expensive thing in the frame, so it renders at a
- * fraction of the canvas resolution into its own target and is then blitted
- * behind the stars. Volumetric detail survives the downscale far better than
- * geometry would — the clouds are low-frequency by nature.
+ * The march is the most expensive thing in the frame, so it runs at a fraction
+ * of the canvas resolution and is reconstructed on the way back up. That
+ * reconstruction is not optional decoration — it is what separates "gas" from
+ * "blocks":
+ *
+ *  - **Bilinear magnification of a raymarch looks quantised.** Every march
+ *    texel covers two to four screen pixels at the tiers this actually runs at,
+ *    and a bilinear tap turns each one into a visible square with hard seams
+ *    along the texel grid. A bicubic B-spline reconstruction costs four taps
+ *    and removes the grid entirely.
+ *  - **The step jitter is white noise, and white noise magnifies into
+ *    speckle.** Offsetting each ray by `hash(gl_FragCoord)` is what stops the
+ *    march banding, but at half resolution the dither itself becomes the
+ *    texture you see. A small separable blur at march resolution costs two
+ *    low-res passes and takes it out.
+ *  - **Averaging frames is cheaper than adding steps.** The jitter advances per
+ *    frame and the result accumulates, so a still camera converges to a clean
+ *    integral over `SETTLE_FRAMES` and then stops marching altogether. That is
+ *    the same standing cost the old single-cached-target path had, for a far
+ *    better image, and it is why the step counts can stay modest.
  */
 export class Nebula {
   readonly compositeMesh: THREE.Mesh;
@@ -75,41 +117,40 @@ export class Nebula {
   private readonly marchScene = new THREE.Scene();
   private readonly marchCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   private readonly marchMaterial: THREE.ShaderMaterial;
+  private readonly blurMaterial: THREE.ShaderMaterial;
+  private readonly blendMaterial: THREE.ShaderMaterial;
   private readonly compositeMaterial: THREE.ShaderMaterial;
-  private target: THREE.WebGLRenderTarget;
+
+  /** Where the raw march lands, and the ping-pong partner the blur bounces off. */
+  private march = lowResTarget();
+  private blurAux = lowResTarget();
+  /** Converged history, ping-ponged because a pass cannot read and write one target. */
+  private accum: [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget] = [lowResTarget(), lowResTarget()];
+  private accumRead = 0;
+
+  /** Fullscreen triangle-ish quad reused by every low-res pass. */
+  private readonly passScene = new THREE.Scene();
+  private readonly passMesh: THREE.Mesh;
+
   private scale: number;
   private width = 1;
   private height = 1;
   private targetDensity = 1;
-  /**
-   * The 1×1 placeholder used until a layout supplies real clusters. Held
-   * separately because the uniform stops pointing at it the moment the sets
-   * layout is entered, and it was previously never freed.
-   */
   private readonly dummyTex: THREE.DataTexture;
   private skipRender = false;
-  private lastPose = '';
+  private lastPose = new THREE.Vector3();
+  private hasPose = false;
+  private lastQuantisedPose = '';
+  private motion = 1;
   private baseSteps = 52;
+  private frame = 0;
+  private settled = 0;
   /** Set whenever a march uniform changes; see `invalidate`. */
   private dirty = true;
-  /**
-   * Baked cluster maps, keyed by layout. `setClusterAttribs` is a pure
-   * function of the catalogue, so a layout's map never changes within a
-   * session and re-baking it on every visit is 128² × 1,049 `exp()` calls on
-   * the main thread for an identical result — about three dropped frames.
-   */
   private clusterCache = new Map<LayoutMode, { texture: THREE.DataTexture; extent: number }>();
 
   constructor(scale = 0.5) {
     this.scale = scale;
-    this.target = new THREE.WebGLRenderTarget(1, 1, {
-      format: THREE.RGBAFormat,
-      type: THREE.HalfFloatType,
-      minFilter: THREE.LinearFilter,
-      magFilter: THREE.LinearFilter,
-      depthBuffer: false,
-      stencilBuffer: false,
-    });
 
     this.marchMaterial = new THREE.ShaderMaterial({
       vertexShader: nebulaVert,
@@ -120,6 +161,7 @@ export class Nebula {
         uCameraWorld: { value: new THREE.Matrix4() },
         uCamPos: { value: new THREE.Vector3() },
         uTime: { value: 0 },
+        uFrame: { value: 0 },
         uIntensity: { value: 1 },
         uSteps: { value: 52 },
         uNoiseScale: { value: 0.0042 },
@@ -142,8 +184,76 @@ export class Nebula {
     this.dummyTex = this.marchMaterial.uniforms.uClusterMap.value as THREE.DataTexture;
     this.marchScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.marchMaterial));
 
+    // Separable Gaussian at march resolution. Radius is in texels, so it costs
+    // the same blur in march-space at every quality tier — which is what we
+    // want, because the point is to erase the step dither, not to soften the
+    // cloud by a fixed number of screen pixels.
+    this.blurMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uMap: { value: null },
+        uDirection: { value: new THREE.Vector2(1, 0) },
+        uTexel: { value: new THREE.Vector2(1, 1) },
+      },
+      vertexShader: FULLSCREEN_VERT,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D uMap;
+        uniform vec2 uDirection;
+        uniform vec2 uTexel;
+        varying vec2 vUv;
+        void main() {
+          vec2 d = uDirection * uTexel;
+          vec3 c = texture2D(uMap, vUv).rgb * 0.38774;
+          c += texture2D(uMap, vUv + d).rgb * 0.24477;
+          c += texture2D(uMap, vUv - d).rgb * 0.24477;
+          c += texture2D(uMap, vUv + d * 2.0).rgb * 0.06136;
+          c += texture2D(uMap, vUv - d * 2.0).rgb * 0.06136;
+          gl_FragColor = vec4(c, 1.0);
+        }
+      `,
+      depthTest: false,
+      depthWrite: false,
+    });
+
+    // The vertical half of the blur is folded into the blend rather than run as
+    // its own pass. Every one of these is a fullscreen draw at march
+    // resolution, and the volume pass is already the most expensive thing in
+    // the frame — three of them on top of the march was enough to pull the
+    // adaptive ladder down a rung, which costs more image quality than the
+    // separate pass was ever going to buy.
+    this.blendMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uCurrent: { value: null },
+        uHistory: { value: null },
+        uAlpha: { value: 1 },
+        uTexel: { value: new THREE.Vector2(1, 1) },
+      },
+      vertexShader: FULLSCREEN_VERT,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D uCurrent;
+        uniform sampler2D uHistory;
+        uniform float uAlpha;
+        uniform vec2 uTexel;
+        varying vec2 vUv;
+        void main() {
+          vec2 d = vec2(0.0, uTexel.y);
+          vec3 cur = texture2D(uCurrent, vUv).rgb * 0.38774;
+          cur += texture2D(uCurrent, vUv + d).rgb * 0.24477;
+          cur += texture2D(uCurrent, vUv - d).rgb * 0.24477;
+          cur += texture2D(uCurrent, vUv + d * 2.0).rgb * 0.06136;
+          cur += texture2D(uCurrent, vUv - d * 2.0).rgb * 0.06136;
+          vec3 hist = texture2D(uHistory, vUv).rgb;
+          gl_FragColor = vec4(mix(hist, cur, uAlpha), 1.0);
+        }
+      `,
+      depthTest: false,
+      depthWrite: false,
+    });
+
     this.compositeMaterial = new THREE.ShaderMaterial({
-      uniforms: { uMap: { value: this.target.texture } },
+      uniforms: {
+        uMap: { value: this.accum[0].texture },
+        uTexSize: { value: new THREE.Vector2(1, 1) },
+      },
       vertexShader: /* glsl */ `
         varying vec2 vUv;
         void main() {
@@ -151,14 +261,50 @@ export class Nebula {
           gl_Position = vec4(position.xy, 1.0, 1.0);
         }
       `,
+      // Bicubic B-spline reconstruction, folded into four bilinear taps. The
+      // B-spline basis is chosen over Catmull-Rom deliberately: it never
+      // overshoots, and a smooth-but-soft magnification is exactly right for a
+      // volume that is low-frequency to begin with.
       fragmentShader: /* glsl */ `
         uniform sampler2D uMap;
+        uniform vec2 uTexSize;
         varying vec2 vUv;
-        void main() { gl_FragColor = vec4(texture2D(uMap, vUv).rgb, 1.0); }
+
+        vec3 bicubic(sampler2D tex, vec2 uv, vec2 texSize) {
+          vec2 invSize = 1.0 / texSize;
+          vec2 c = uv * texSize - 0.5;
+          vec2 f = fract(c);
+          c = floor(c);
+
+          vec2 w0 = (1.0 / 6.0) * (((-f + 3.0) * f - 3.0) * f + 1.0);
+          vec2 w1 = (1.0 / 6.0) * ((3.0 * f - 6.0) * f * f + 4.0);
+          vec2 w2 = (1.0 / 6.0) * (((-3.0 * f + 3.0) * f + 3.0) * f + 1.0);
+          vec2 w3 = (1.0 / 6.0) * (f * f * f);
+
+          vec2 s0 = w0 + w1;
+          vec2 s1 = w2 + w3;
+          vec2 o0 = (c + w1 / s0 - 0.5) * invSize;
+          vec2 o1 = (c + w3 / s1 + 1.5) * invSize;
+
+          vec3 a = texture2D(tex, vec2(o0.x, o0.y)).rgb;
+          vec3 b = texture2D(tex, vec2(o1.x, o0.y)).rgb;
+          vec3 cc = texture2D(tex, vec2(o0.x, o1.y)).rgb;
+          vec3 d = texture2D(tex, vec2(o1.x, o1.y)).rgb;
+
+          return mix(mix(b, a, s0.x), mix(d, cc, s0.x), s0.y);
+        }
+
+        void main() {
+          gl_FragColor = vec4(bicubic(uMap, vUv, uTexSize), 1.0);
+        }
       `,
       depthTest: false,
       depthWrite: false,
     });
+
+    this.passMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.blurMaterial);
+    this.passMesh.frustumCulled = false;
+    this.passScene.add(this.passMesh);
 
     this.compositeMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.compositeMaterial);
     this.compositeMesh.frustumCulled = false;
@@ -181,9 +327,17 @@ export class Nebula {
 
     const w = Math.max(1, Math.round(width * scale));
     const h = Math.max(1, Math.round(height * scale));
-    if (this.target.width === w && this.target.height === h) return;
-    this.target.setSize(w, h);
+    if (this.march.width === w && this.march.height === h) return;
+
+    this.march.setSize(w, h);
+    this.blurAux.setSize(w, h);
+    this.accum[0].setSize(w, h);
+    this.accum[1].setSize(w, h);
+
     this.marchMaterial.uniforms.uResolution.value.set(w, h);
+    this.blurMaterial.uniforms.uTexel.value.set(1 / w, 1 / h);
+    this.blendMaterial.uniforms.uTexel.value.set(1 / w, 1 / h);
+    this.compositeMaterial.uniforms.uTexSize.value.set(w, h);
     this.invalidate();
   }
 
@@ -250,31 +404,60 @@ export class Nebula {
     }
     u.value += gap * (1 - Math.exp(-dt * 2.2));
     // The ease runs over many frames, and every one of them is a uniform the
-    // cached target does not have yet.
+    // settled history does not have yet.
     this.invalidate();
   }
 
   /**
-   * Force the next frame to actually march.
+   * Force the volume to march again and drop its history.
    *
-   * `prepareFrame` reuses the last target whenever the camera has not moved,
-   * and the composite pass does nothing but blit it — so a uniform changed
-   * while the camera is at rest never reaches the screen on its own. With
-   * auto-rotate off (a persisted setting) that silently disabled the nebula
-   * toggle, the intensity slider and the filter-driven density change.
+   * A settled volume stops marching entirely, and the composite pass does
+   * nothing but reconstruct the accumulated target — so a uniform changed while
+   * the camera is at rest never reaches the screen on its own. With auto-rotate
+   * off (a persisted setting) that silently disabled the nebula toggle, the
+   * intensity slider and the filter-driven density change.
    */
-  invalidate(): void { this.dirty = true; }
+  invalidate(): void {
+    this.dirty = true;
+    this.settled = 0;
+  }
 
   /**
-   * Skip the march when the camera has not moved (reuse last target) and cut
-   * steps when looking at the whole layout from far away. The composite mesh
-   * still draws either way.
+   * Decide whether this frame marches, how hard, and how much history it keeps.
+   *
+   * Three states: the camera moved (short history, so the gas does not smear
+   * behind the move), the camera is at rest and still converging (history
+   * lengthens each frame, averaging the jitter away), or it has converged and
+   * the whole volume pass is skipped.
    */
   prepareFrame(camera: THREE.PerspectiveCamera, distance: number, bound: number, moving: boolean): void {
-    const pose = `${camera.position.x.toFixed(1)}|${camera.position.y.toFixed(1)}|${camera.position.z.toFixed(1)}`;
-    this.skipRender = !this.dirty && !moving && pose === this.lastPose;
-    this.lastPose = pose;
-    // Framed distance is ~2.25× the bound, so 1.85 treated the default view as
+    const pos = camera.position;
+    // First call has no previous pose to measure against. Seeding `lastPose`
+    // with a sentinel instead made `travel` infinite, and infinity survives the
+    // decay below forever — the volume then never settles and marches every
+    // frame, which is the entire cost this class exists to avoid.
+    const travel = this.hasPose ? this.lastPose.distanceTo(pos) / Math.max(bound, 1) : 0;
+    this.lastPose.copy(pos);
+    this.hasPose = true;
+    // Smoothed, so one slow frame in the middle of a drag does not read as a
+    // stop and snap the history long.
+    this.motion = Math.max(travel * 40, this.motion * 0.72);
+
+    /*
+     * Stillness is decided on a pose quantised to a tenth of a unit, not on a
+     * raw distance threshold. Damping is asymptotic, so a camera nobody is
+     * touching keeps moving by ever-smaller amounts indefinitely and an exact
+     * threshold is met only by luck. The quantised comparison is what the
+     * single-target cache used before this class accumulated, and it is the
+     * behaviour the interaction suite's cache check is written against.
+     */
+    const pose = `${pos.x.toFixed(1)}|${pos.y.toFixed(1)}|${pos.z.toFixed(1)}`;
+    const still = !moving && pose === this.lastQuantisedPose;
+    this.lastQuantisedPose = pose;
+    if (!still || this.dirty) this.settled = 0;
+    this.skipRender = still && !this.dirty && this.settled >= SETTLE_FRAMES;
+
+    // Framed distance is ~2.25x the bound, so 1.85 treated the default view as
     // "far" and marched at 55% steps — the hero shot was the softest one.
     const far = distance > bound * 2.6;
     const steps = far ? Math.max(16, Math.round(this.baseSteps * 0.55)) : this.baseSteps;
@@ -283,26 +466,69 @@ export class Nebula {
 
   render(renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera, time: number): void {
     if (this.skipRender) return;
+
+    const reset = this.dirty;
     this.dirty = false;
+    this.frame++;
+
     const u = this.marchMaterial.uniforms;
     u.uTime.value = time;
+    u.uFrame.value = this.frame;
     u.uInvProjection.value.copy(camera.projectionMatrixInverse);
     u.uCameraWorld.value.copy(camera.matrixWorld);
     camera.getWorldPosition(u.uCamPos.value);
 
     const prevTarget = renderer.getRenderTarget();
-    renderer.setRenderTarget(this.target);
+
+    // 1. March.
+    renderer.setRenderTarget(this.march);
     renderer.render(this.marchScene, this.marchCamera);
+
+    // 2. Horizontal half of the denoise.
+    this.passMesh.material = this.blurMaterial;
+    this.blurMaterial.uniforms.uMap.value = this.march.texture;
+    this.blurMaterial.uniforms.uDirection.value.set(1, 0);
+    renderer.setRenderTarget(this.blurAux);
+    renderer.render(this.passScene, this.marchCamera);
+
+    // 3. Vertical half + accumulate, in one draw. A reset takes the current frame whole; a moving camera
+    // keeps a short tail; a still one lengthens the average every frame.
+    const write = 1 - this.accumRead;
+    let alpha: number;
+    if (reset) {
+      alpha = 1;
+    } else if (this.motion > 0.02) {
+      alpha = THREE.MathUtils.clamp(0.42 + this.motion * 0.9, 0.42, 1);
+    } else {
+      this.settled++;
+      alpha = Math.max(1 / (this.settled + 1), 0.08);
+    }
+
+    this.passMesh.material = this.blendMaterial;
+    this.blendMaterial.uniforms.uCurrent.value = this.blurAux.texture;
+    this.blendMaterial.uniforms.uHistory.value = this.accum[this.accumRead].texture;
+    this.blendMaterial.uniforms.uAlpha.value = alpha;
+    renderer.setRenderTarget(this.accum[write]);
+    renderer.render(this.passScene, this.marchCamera);
+
+    this.accumRead = write;
+    this.compositeMaterial.uniforms.uMap.value = this.accum[write].texture;
+
     renderer.setRenderTarget(prevTarget);
   }
 
   dispose(): void {
-    this.target.dispose();
+    this.march.dispose();
+    this.blurAux.dispose();
+    this.accum[0].dispose();
+    this.accum[1].dispose();
     this.dummyTex.dispose();
     for (const baked of this.clusterCache.values()) baked.texture.dispose();
     this.clusterCache.clear();
     this.marchMaterial.uniforms.uNoise.value?.dispose();
     this.marchMaterial.dispose();
+    this.blurMaterial.dispose();
+    this.blendMaterial.dispose();
     this.compositeMaterial.dispose();
   }
 }

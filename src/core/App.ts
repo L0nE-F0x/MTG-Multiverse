@@ -341,7 +341,14 @@ export class App {
         if (this.rig.distance > 260) this.rig.frame(this.framedDistance());
       }),
     );
+    // Both of these are also driven by the `shell` subscription above, but a
+    // subscription only fires on a *change*. A visit that starts on the title
+    // screen never changes shell until you enter it, so the era rings and their
+    // year labels drew straight through the title — ALPHA, REVISED and MODERN
+    // sitting behind the wordmark, looking like a rendering fault.
     this.rig.setInputEnabled(store.state.shell === 'play');
+    this.eraMarkers.setEnabled(store.state.shell === 'play');
+    this.labels.setEnabled(store.state.visual.showLabels && store.state.shell === 'play');
   }
 
   /** Frame the whole current layout again, without changing the heading. */
@@ -615,7 +622,7 @@ export class App {
       dt, this.camera, this.rig.distance, store.state.hovered, store.state.selected,
     );
     this.labels.update(dt, this.camera, this.rig.distance, store.state.selected);
-    this.coreGlow.update(dt);
+    this.coreGlow.update(dt, this.camera);
     this.eraMarkers.update(dt, this.camera, this.rig.distance);
     this.printingTrail.update(dt);
 

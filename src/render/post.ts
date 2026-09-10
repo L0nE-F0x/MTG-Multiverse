@@ -3,6 +3,7 @@ import {
   BlendFunction,
   BloomEffect,
   ChromaticAberrationEffect,
+  Effect,
   EffectComposer,
   EffectPass,
   KernelSize,
@@ -119,6 +120,61 @@ const FULLSCREEN_VERT = /* glsl */ `
   }
 `;
 
+/**
+ * Final colour grade, applied after tone mapping.
+ *
+ * ACES is doing its job — it keeps a genuinely HDR star field from clipping —
+ * but the way it does it is by desaturating as luminance climbs, and in a
+ * galaxy whose entire subject is five coloured arms that reads as everything
+ * fading to the same pale cream. This puts the colour back where the tone map
+ * took it from, and only there:
+ *
+ *  - **Saturation is weighted toward the midtones.** Pushing it into a
+ *    near-white core does not recover a hue, it just produces a coloured clip
+ *    around the nucleus. The arms live between a fifth and two thirds of the
+ *    range, which is exactly where the weight sits.
+ *  - **Split toning does the rest.** Cool shadows and faintly warm highlights
+ *    is what separates a photograph of space from a dark grey render; it also
+ *    gives the inter-arm void a colour of its own instead of leaving it a hole.
+ *  - **The S-curve is a smoothstep, not a pivot around middle grey.** A
+ *    contrast pivot on an image that is four fifths black lifts the void into
+ *    a grey haze. A smoothstep leaves black at black and steepens only the
+ *    middle, which deepens the dust lanes rather than filling them.
+ */
+class GradeEffect extends Effect {
+  constructor() {
+    super('GradeEffect', /* glsl */ `
+      uniform float uSaturation;
+      uniform float uContrast;
+      uniform vec3  uShadow;
+      uniform vec3  uHighlight;
+
+      void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
+        vec3 c = max(inputColor.rgb, 0.0);
+        float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
+
+        float w = 1.0 - smoothstep(0.30, 0.92, luma);
+        c = mix(vec3(luma), c, 1.0 + uSaturation * w);
+
+        c *= mix(uShadow, uHighlight, smoothstep(0.04, 0.72, luma));
+
+        vec3 sc = clamp(c, 0.0, 1.0);
+        c = mix(c, sc * sc * (3.0 - 2.0 * sc), uContrast);
+
+        outputColor = vec4(max(c, 0.0), inputColor.a);
+      }
+    `, {
+      blendFunction: BlendFunction.SET,
+      uniforms: new Map<string, THREE.Uniform>([
+        ['uSaturation', new THREE.Uniform(0.34)],
+        ['uContrast', new THREE.Uniform(0.20)],
+        ['uShadow', new THREE.Uniform(new THREE.Color(0.82, 0.90, 1.14))],
+        ['uHighlight', new THREE.Uniform(new THREE.Color(1.06, 1.00, 0.93))],
+      ]),
+    });
+  }
+}
+
 export interface PostChain {
   composer: EffectComposer;
   setBloom(intensity: number): void;
@@ -176,8 +232,11 @@ export function createPostChain(
     middleGrey: 0.42,
   });
 
-  // One pass: the library merges these into a single fragment shader.
-  composer.addPass(new EffectPass(camera, bloom, chromatic, vignette, grain, toneMapping));
+  // One pass: the library merges these into a single fragment shader, in this
+  // order. The grade has to come after tone mapping — that is the whole point
+  // of it — so it is last in the list.
+  const grade = new GradeEffect();
+  composer.addPass(new EffectPass(camera, bloom, chromatic, vignette, grain, toneMapping, grade));
 
   return {
     composer,

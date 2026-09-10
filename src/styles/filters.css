@@ -394,3 +394,89 @@
     height: 22px;
   }
 }
+
+/* ---- Depth pass -------------------------------------------------------
+ * The panel is a tall column of near-identical controls, and at that density
+ * flatness stops being a style and becomes a legibility problem: nothing tells
+ * you where one group ends and the next begins. These add the two cues that
+ * were missing — a lit surface on each control, and a visible rhythm between
+ * sections. */
+
+/* A short accent rule leads into each heading, so the eye can find the seams
+   in a list of forty chips without reading any of the labels. */
+.mcu-filter-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mcu-filter-heading::before {
+  content: '';
+  width: 3px;
+  height: 11px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--mcu-cyan), rgba(165, 107, 255, 0.55));
+  box-shadow: 0 0 8px rgba(94, 231, 255, 0.45);
+  flex: 0 0 auto;
+}
+.mcu-filter-heading::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: linear-gradient(90deg, var(--mcu-border), transparent);
+}
+
+/* Sections arrive in sequence rather than together. `both` holds the
+   from-state through the delay, which is what stops a flash of the finished
+   layout before the animation starts. */
+.mcu-filters--open .mcu-filter-section {
+  animation: mcu-rise-in 460ms var(--mcu-ease) both;
+}
+.mcu-filters--open .mcu-filter-section:nth-child(1) { animation-delay: calc(var(--mcu-stagger) * 1); }
+.mcu-filters--open .mcu-filter-section:nth-child(2) { animation-delay: calc(var(--mcu-stagger) * 2); }
+.mcu-filters--open .mcu-filter-section:nth-child(3) { animation-delay: calc(var(--mcu-stagger) * 3); }
+.mcu-filters--open .mcu-filter-section:nth-child(4) { animation-delay: calc(var(--mcu-stagger) * 4); }
+.mcu-filters--open .mcu-filter-section:nth-child(5) { animation-delay: calc(var(--mcu-stagger) * 5); }
+.mcu-filters--open .mcu-filter-section:nth-child(6) { animation-delay: calc(var(--mcu-stagger) * 6); }
+.mcu-filters--open .mcu-filter-section:nth-child(n + 7) { animation-delay: calc(var(--mcu-stagger) * 7); }
+
+/*
+ * Colour pips. The inactive state used to crush brightness to 62%, which on a
+ * palette this close together left five indistinguishable olive circles — the
+ * one control in the panel whose whole job is to be told apart at a glance.
+ * Dimming by opacity keeps the hue and takes only the intensity, and the inner
+ * shading gives a 26px dot enough form to read as a button.
+ */
+.mcu-color-pip {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.45), transparent 58%),
+    var(--pip-color);
+  box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.32), 0 1px 3px rgba(0, 0, 0, 0.45);
+  filter: none;
+  opacity: 0.46;
+}
+.mcu-color-pip:hover { opacity: 0.74; }
+.mcu-color-pip--active {
+  filter: none;
+  opacity: 1;
+  border-color: rgba(255, 255, 255, 0.85);
+  box-shadow:
+    inset 0 -2px 4px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 0 18px var(--pip-color);
+  transform: scale(1.1);
+}
+.mcu-color-pip:disabled { opacity: 0.18; }
+
+/* The tab is the only thing on screen when the panel is shut, so it earns the
+   same surface treatment as the panel it opens. */
+.mcu-filters-tab {
+  background:
+    linear-gradient(180deg, rgba(30, 38, 64, 0.5), rgba(9, 11, 22, 0.28)),
+    var(--mcu-panel-bg);
+  box-shadow: inset 0 1px 0 rgba(190, 220, 255, 0.12), 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mcu-filters--open .mcu-filter-section { animation: none; }
+}

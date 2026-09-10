@@ -13,6 +13,62 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 # ▶ START HERE — next session
 
+**2026-09-10 — eye-candy pass: ten items, all shipped. Interaction suite 67/67.**
+
+The reported "pixelated nebulae" were the raymarch being stretched, not the
+stars. The volume renders at a quarter to a half of canvas resolution and was
+magnified with plain bilinear, so every march texel became a visible square,
+and the white-noise step jitter became speckle on top. Fixed by reconstructing
+it properly rather than by marching harder.
+
+Galaxy:
+
+1. **Nebula reconstruction.** Separable blur at march resolution, bicubic
+   B-spline upsample, one fewer fullscreen pass than the obvious version (the
+   vertical blur is folded into the temporal blend).
+2. **Temporal accumulation.** The jitter advances one golden-ratio turn per
+   frame; a still camera converges over ~14 frames and then stops marching, so
+   the standing cost is what the old single-target cache paid.
+3. **Gas that reads as mist.** Softer ridge gate plus a broad low-amplitude
+   veil, gated by the macro field so the inter-arm dark survives.
+4. **Colour grade after tone mapping.** ACES was desaturating the arms to
+   cream. Midtone-weighted saturation, split tone, smoothstep S-curve.
+5. **The nucleus.** Colour-temperature ramp across four layers, flattened to
+   the disc by camera elevation, plus a diffraction glare that holds a fixed
+   angular size and fades out as you arrive (it is a lens artefact, not a body).
+6. **Star depth.** Size floor raised off one pixel so the far disc is mist
+   rather than dots, and mild atmospheric perspective by distance.
+
+Interface:
+
+7. **Filter panel depth** — lit surfaces on the chips, accent rule per section
+   heading, staggered arrival.
+8. **HUD glass** — specular top edge on the command bar and switcher, breathing
+   halo on the active layout, sheen on the wordmark.
+9. **Title screen** — era ring labels no longer draw through it (they were only
+   disabled on a *change* of shell, and a visit that starts on the title never
+   changes it), symmetric wordmark gradient, aperture on Enter, tinted
+   secondary buttons.
+10. **Motion** — one stagger token drives filters, settings, card panel and
+    title; the layout description crossfades instead of swapping mid-morph.
+
+**The thing that cost the most time, written up in `CLAUDE.md`:** the first
+version of the veil used a four-octave `fbm` inside `filament()`. That is paid
+per step, per ray, per pixel — about half the march again. It did not present
+as a slow nebula. The adaptive ladder fell to its floor and the *pointer*
+stopped keeping up, so the interaction suite lost nine hover/click checks in a
+block, a long way from where the cost was added. If that failure shape appears
+again, measure `stats.ms` before touching `Picker`.
+
+Also worth knowing: a later `position: relative` at equal specificity beat
+`.mcu-command-bar`'s own `position: fixed` and dropped the bar into normal
+flow, stretching it across the whole top of the window. A fixed element is
+already a positioned ancestor; it never needed the override.
+
+Open: AUR `filthy-net-deck-bin` still waits on Arch registration. This has not
+been vendored into Filthy Net Deck — that needs `npm run aetherfield` there
+plus a version bump and a full release.
+
 **2026-09-06 night — session closed. Nothing in flight.**
 
 FND **v3.7.4** is on Windows, macOS and Linux. Aetherfield live has the look

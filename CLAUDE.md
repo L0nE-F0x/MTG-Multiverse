@@ -69,6 +69,28 @@ re-running `data:build` — the loader refuses a mismatched version on purpose.
   moved, which is why it presented as a ~50% test flake with a stationary
   cursor rather than an obvious bug. If picking ever goes async again it needs
   both a stall timeout and a generation tag per request, or that returns.
+- **A low-resolution raymarch has to be *reconstructed*, not just stretched.**
+  The volume renders at a quarter to a half of canvas resolution, and a plain
+  bilinear magnification of that turns every march texel into a visible square
+  — the "pixelated nebula" this was reported as. Three things fix it and all
+  three are needed: a separable blur at march resolution (the step jitter is
+  white noise, and white noise magnifies into speckle), a bicubic B-spline
+  reconstruction on the way up (four taps, no overshoot, no texel grid), and
+  temporal accumulation (the jitter advances per frame, a still camera
+  converges in about a dozen frames and then stops marching entirely).
+- **Cost inside `filament()` is paid per step, per ray, per pixel.** Adding a
+  four-octave `fbm` there for the inter-arm veil cost about half the march
+  again. That did not present as "the nebula is slow": the adaptive ladder
+  dropped to its floor, and at that frame rate the *pointer* stopped keeping
+  up, so hover and click were what broke in the interaction suite. A single
+  `n1()` fetch gives the same broad haze. Before adding anything to that
+  function, count the texture fetches.
+- **The interaction suite is the frame-budget alarm.** Nothing in it measures
+  frame rate directly, but the hover and click checks fail once the app is slow
+  enough, and they fail a long way from wherever the cost was added. A run
+  that loses the nine pointer checks in a block and nothing else is a
+  performance regression, not a picking regression — measure `stats.ms` before
+  going anywhere near `Picker`.
 - **The nebula caches its march, so a uniform change needs `invalidate()`.**
   `prepareFrame` reuses the last render target whenever the camera has not
   moved, and the composite pass does nothing but blit it. Anything that writes
@@ -199,6 +221,15 @@ overlapped; a continuous outward spiral blurred into a filled disc wherever
 years were dense; and concentric rings keyed to *day of year* stayed mostly
 empty, because Magic ships in four to six bursts a year rather than continuously.
 Ranking cards within their year fills the ring while staying monotone in date.
+
+## Two mana palettes, on purpose
+
+`ui/theme.ts` carries both. `MANA_COLOR_HEX` is the card-frame palette and is
+right wherever something stands in for a card. `MANA_UI_HEX` is a saturated set
+for chrome on a dark ground, and every colour pip uses it: the frame colours sit
+within a few percent of each other in saturation, so five dimmed dots of them
+are five identical olive circles, and telling them apart at a glance is the only
+thing a pip is for.
 
 ## Popularity is per printing, not per card
 

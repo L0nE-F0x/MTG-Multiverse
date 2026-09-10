@@ -130,7 +130,8 @@ export class Starfield {
         uStarSize: { value: 1 },
         uDim: { value: 0.06 },
         uSizeScale: { value: 600 },
-        uMinPixels: { value: 1.05 },
+        uMinPixels: { value: 1.4 },
+        uDepthScale: { value: Math.max(40, this.boundRadius) },
         uHovered: { value: -1 },
         uSelected: { value: -1 },
         uTwinkle: { value: 1 },
@@ -210,6 +211,8 @@ export class Starfield {
     computeLayout(mode, this.ctx, this.scratch);
     this.posB.set(this.scratch);
     this.boundRadius = boundingRadius(this.scratch);
+
+    this.material.uniforms.uDepthScale.value = Math.max(40, this.boundRadius);
 
     this.geometry.getAttribute('position').needsUpdate = true;
     this.geometry.getAttribute('aPosB').needsUpdate = true;

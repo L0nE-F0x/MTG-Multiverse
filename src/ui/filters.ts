@@ -11,7 +11,7 @@ import type { Universe } from '../data/universe.ts';
 import { capitalize, el, fmtInt, listen } from './dom.ts';
 import { createDualRangeSlider } from './rangeSlider.ts';
 import { uiScale } from './scale.ts';
-import { MANA_COLOR_HEX, rarityColor } from './theme.ts';
+import { MANA_UI_HEX, rarityColor } from './theme.ts';
 import '../styles/filters.css';
 
 export interface FiltersHandle {
@@ -70,7 +70,7 @@ export function mountFilters(root: HTMLElement, universe: Universe): FiltersHand
       attrs: { type: 'button', 'aria-label': COLOR_NAME[c], 'aria-pressed': 'false' },
     });
     tip(btn, `${COLOR_NAME[c]} colour identity.`);
-    btn.style.setProperty('--pip-color', MANA_COLOR_HEX[c] ?? '#888');
+    btn.style.setProperty('--pip-color', MANA_UI_HEX[c] ?? '#888');
     btn.addEventListener('click', () => {
       const colors = new Set(store.state.filter.colors);
       if (colors.has(c)) colors.delete(c);

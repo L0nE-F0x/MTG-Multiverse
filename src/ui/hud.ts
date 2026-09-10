@@ -126,7 +126,16 @@ export function mountHud(root: HTMLElement, universe: Universe, hooks: HudHooks)
       btn.classList.toggle('mcu-layout-btn--active', active);
       btn.setAttribute('aria-pressed', String(active));
     }
-    descEl.textContent = LAYOUTS.find((l) => l.mode === current)?.desc ?? '';
+    const next = LAYOUTS.find((l) => l.mode === current)?.desc ?? '';
+    if (next === descEl.textContent) return;
+    descEl.textContent = next;
+    // Re-trigger the crossfade. Removing the class and reading `offsetWidth`
+    // forces the style flush that lets the same animation start again; without
+    // it the second layout change onwards swaps the text with no transition,
+    // because the class is already there and nothing has changed.
+    descEl.classList.remove('mcu-layout-desc--swap');
+    void descEl.offsetWidth;
+    descEl.classList.add('mcu-layout-desc--swap');
   }
   paintLayout();
   const offLayout = store.on('layout', paintLayout);
