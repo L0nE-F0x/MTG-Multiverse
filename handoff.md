@@ -95,7 +95,8 @@ already a positioned ancestor; it never needed the override.
 
 Open: AUR `filthy-net-deck-bin` still waits on Arch registration. This has not
 been vendored into Filthy Net Deck — that needs `npm run aetherfield` there
-plus a version bump and a full release.
+plus a version bump and a full release. *(Done later the same day: FND
+v3.8.2 ships it on all three platforms.)*
 
 **2026-09-06 night — session closed. Nothing in flight.**
 
