@@ -119,6 +119,26 @@ export function mountHud(root: HTMLElement, universe: Universe, hooks: HudHooks)
   const switcher = el('div', { className: 'mcu-layout-switcher' }, [switcherInner]);
   root.append(switcher);
 
+  /*
+   * Publish the height of the bottom chrome so anything else that wants to sit
+   * above it can, without re-deriving it. The switcher is three stacked rows
+   * whose heights differ between desktop and mobile — the description is
+   * hidden under 900px, the buttons grow to a touch target and wrap their
+   * labels — so a hard-coded clearance is right on exactly one viewport. The
+   * cinematic skip button used one, and it landed on the format row.
+   *
+   * `offsetHeight` plus the computed `bottom`, both layout pixels, which is
+   * the space the consumer's own `bottom` is measured in.
+   */
+  const reportHudBottom = (): void => {
+    const gap = parseFloat(getComputedStyle(switcher).bottom) || 0;
+    root.style.setProperty('--mcu-hud-bottom', `${Math.round(gap + switcher.offsetHeight)}px`);
+  };
+  reportHudBottom();
+  const hudBottomObserver = new ResizeObserver(reportHudBottom);
+  hudBottomObserver.observe(switcher);
+  window.addEventListener('resize', reportHudBottom);
+
   function paintLayout(): void {
     const current = store.state.layout;
     for (const [mode, btn] of buttons) {
@@ -158,6 +178,9 @@ export function mountHud(root: HTMLElement, universe: Universe, hooks: HudHooks)
       offFilterCount();
       offLayout();
       offFormat();
+      hudBottomObserver.disconnect();
+      window.removeEventListener('resize', reportHudBottom);
+      root.style.removeProperty('--mcu-hud-bottom');
       commandBar.remove();
       switcher.remove();
     },

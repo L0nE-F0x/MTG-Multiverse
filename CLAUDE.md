@@ -145,12 +145,49 @@ looks like a pointless detail until it is missing:
 
 Everything else — the renderer, the store, the UI layer — is unchanged, and
 `isEmbedded()` gates the differences so an ordinary browser visit pays nothing.
-The service worker is one of those differences: it belongs to the public site
-only, and registering it on the host's origin would quietly cache the host's
-assets.
+The service worker is one of those differences: inside a frame there is no home
+screen to install to, and registering it would cache the host's assets for a
+window nobody revisits offline.
 
 The host is verified against the *built* site, not the dev server, because
 `base` and the vendored folder only exist after a build.
+
+## Installable from two origins
+
+The same build is a PWA at `mtg-multiverse.netlify.app/` and at
+`filthy-net-deck.com/aetherfield/`, which Netlify 200-proxies to that origin.
+That works only because nothing in the PWA surface names a path from the root:
+
+- **Every manifest URL is `./`-relative**, and `manifest.webmanifest` has no
+  `id`. `start_url`, `scope` and the icon `src`s resolve against the manifest's
+  own URL, so they land on `/` at the origin and `/aetherfield/` behind the
+  proxy. `id` is the one member that would *not*: the spec resolves it against
+  the **origin** of `start_url`, so a relative one gives the host's root either
+  way. Omitting it defaults the identity to `start_url`, which is what makes
+  the two installs distinct apps — and is also exactly the identity the
+  original `"id": "/"` produced at the origin, so installs from before this
+  survive the change. Vite rewrites the `<link>` hrefs in `index.html` on its
+  own (that is `base: './'`); files in `public/` it copies verbatim, which is
+  why the manifest had to be edited by hand.
+- **`sw.js` resolves everything against its own directory.** Relative URLs in
+  a worker script resolve against the script URL, and `SCOPE` is derived from
+  `self.location`, so the shell list and the `assets/` cache-first test are
+  right at either depth. It also refuses any request whose path is above
+  `SCOPE`, so a worker installed from the host site can never answer for the
+  host's own pages.
+- **Neither end may widen the scope.** `main.ts` passes an explicit relative
+  `scope` to `register()`, and the origin no longer sends
+  `Service-Worker-Allowed: /`. Either one alone is enough; both are cheap.
+  Filthy Net Deck used to 404 `/aetherfield/sw.js` for exactly this reason and
+  now proxies it, which is what makes the host copy installable at all.
+
+Chrome will not offer to install without a worker that has a `fetch` handler,
+so this is the whole feature, not a nicety. Verify it by serving `dist/` under
+a subdirectory of a throwaway root over `127.0.0.1` (service workers need a
+secure context, and localhost counts) and reading
+`Page.getInstallabilityErrors` over CDP — an empty list plus a
+`beforeinstallprompt` event is the actual verdict. Check the root case in the
+same run; the two resolve differently and only one of them is what you edited.
 
 ## The UI tells the renderer what it is covering
 
@@ -175,6 +212,14 @@ is what catches it.
 `--mcu-inset-left` carries the same number into CSS, because the layout
 switcher has to centre on the free area too; centring it on the canvas put it
 on top of the panel, and it wins the z-order.
+
+`--mcu-hud-bottom` is the same idea on the other axis. `hud.ts` measures the
+layout switcher and publishes its height, because that stack is ~30px shorter
+under 900px — the description is hidden, the buttons grow to a touch target
+and wrap — so a constant clearance above it is correct on exactly one
+viewport. The cinematic skip button used one and sat on top of the format row
+on both. Anything else that wants to float above the bottom chrome reads that
+variable rather than guessing again.
 
 **`ui/scale.ts` uses `zoom`, not `transform: scale()`.** A transform blurs text
 and does not change layout, so the panel would keep reserving its unscaled

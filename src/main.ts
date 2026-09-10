@@ -117,16 +117,26 @@ async function main(): Promise<void> {
 
   Object.assign(window as unknown as Record<string, unknown>, { __mcu: { app, universe, store, ui } });
 
-  // The service worker belongs to the public site at its origin root.
-  // Framed inside FND it would cache the host's assets. Served under
-  // filthy-net-deck.com/aetherfield/ it would claim that origin (sw.js is
-  // root-absolute and Netlify sends Service-Worker-Allowed: /). Pathname
-  // must be `/` — `isEmbedded()` only means "inside an iframe".
-  const atSiteRoot = location.pathname === '/' || location.pathname === '/index.html';
-  const ownsOrigin = !isEmbedded() && location.protocol.startsWith('http') && atSiteRoot;
-  if (import.meta.env.PROD && ownsOrigin && 'serviceWorker' in navigator) {
+  /*
+   * Register the service worker — the thing that makes this installable.
+   *
+   * It is registered from wherever the document is, not only from the origin
+   * root, so the copy Filthy Net Deck proxies at `/aetherfield/` installs to a
+   * phone home screen exactly as the public site does. `scope` is passed
+   * explicitly and relatively so it can never be wider than that directory:
+   * the origin used to send `Service-Worker-Allowed: /`, and a worker that
+   * took it up would put Aetherfield's cache in front of the host's own
+   * marketing pages.
+   *
+   * Still skipped inside an iframe. Framed in the desktop app there is no
+   * home screen to install to, and the worker would cache the host's assets
+   * for a window that is never revisited offline.
+   */
+  const ownsScope = !isEmbedded() && location.protocol.startsWith('http');
+  if (import.meta.env.PROD && ownsScope && 'serviceWorker' in navigator) {
     const swUrl = new URL('sw.js', document.baseURI).href;
-    void navigator.serviceWorker.register(swUrl).catch(() => {});
+    const scope = new URL('./', document.baseURI).href;
+    void navigator.serviceWorker.register(swUrl, { scope }).catch(() => {});
   }
 }
 

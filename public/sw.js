@@ -1,17 +1,38 @@
-/* App-shell service worker. Hashed Vite assets are immutable; /data/ is
-   network-first so a new catalogue is picked up without a hard refresh. */
+/*
+ * App-shell service worker.
+ *
+ * Everything here is resolved against the worker's own directory rather than
+ * the origin root, because the same file is registered from two places: the
+ * public site at `https://mtg-multiverse.netlify.app/`, and the copy Filthy
+ * Net Deck proxies at `https://filthy-net-deck.com/aetherfield/`. Relative
+ * URLs in a worker script resolve against the script URL, so `./index.html`
+ * is the right entry in both, and `SCOPE` below is `/` on one and
+ * `/aetherfield/` on the other.
+ *
+ * That prefix is also the guard: a worker served from a subdirectory must
+ * never answer for anything above it, or installing Aetherfield from the host
+ * site would put its cache in front of the host's own pages.
+ *
+ * Hashed Vite assets are immutable and go cache-first; everything else
+ * (including `data/`, so a new catalogue is picked up without a hard refresh)
+ * is network-first.
+ */
 
-const VERSION = 'aetherfield-pwa-5';
+const VERSION = 'aetherfield-pwa-6';
+
+/** Directory this worker was served from, with its trailing slash. */
+const SCOPE = new URL('./', self.location.href).pathname;
+
 const SHELL = [
-  '/',
-  '/index.html',
-  '/manifest.webmanifest',
-  '/favicon.svg',
-  '/mark.svg',
-  '/icon-192.png',
-  '/icon-512.png',
-  '/icon-512-maskable.png',
-  '/apple-touch-icon.png',
+  './',
+  './index.html',
+  './manifest.webmanifest',
+  './favicon.svg',
+  './mark.svg',
+  './icon-192.png',
+  './icon-512.png',
+  './icon-512-maskable.png',
+  './apple-touch-icon.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -34,8 +55,9 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+  if (!url.pathname.startsWith(SCOPE)) return;
 
-  if (url.pathname.startsWith('/assets/')) {
+  if (url.pathname.startsWith(`${SCOPE}assets/`)) {
     event.respondWith(cacheFirst(req));
     return;
   }

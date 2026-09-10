@@ -13,6 +13,34 @@ Architecture notes live in `CLAUDE.md`. This file is only the live todo.
 
 # ▶ START HERE — next session
 
+**2026-09-10 later — skip-intro placement, and the host copy is installable.**
+
+Three things, all shipped:
+
+1. **The skip pill sat on the format row**, on desktop and on a phone. It was
+   at a constant `bottom: 96px` and the bottom chrome is not a constant
+   height — the layout description is hidden under 900px and the buttons grow
+   to a touch target. `hud.ts` now measures the switcher and publishes
+   `--mcu-hud-bottom`; the pill floats above that and centres on the free area
+   like the switcher does. "· Esc" is dropped on coarse pointers.
+2. **`filthy-net-deck.com/aetherfield/` is now PWA-installable**, on Android
+   and iOS, the same as the origin. Everything in the manifest is `./`-relative
+   and `id` is gone (the spec resolves `id` against the *origin*, so a relative
+   one would not have moved); `sw.js` resolves against its own directory and
+   refuses anything above its scope; `main.ts` registers with an explicit
+   narrow scope; the origin no longer sends `Service-Worker-Allowed: /`; and
+   FND's `website/netlify.toml` proxies `/aetherfield/sw.js` instead of 404ing
+   it. Verified with `Page.getInstallabilityErrors` (empty) plus a
+   `beforeinstallprompt` at both depths, and the fake host root above the
+   scope is confirmed uncontrolled. Written up in `CLAUDE.md`.
+3. **Vendored into Filthy Net Deck** — see that repo's handoff.
+
+Interaction suite 67/67. One caveat worth remembering: a run with other
+Chrome instances and static servers alive on the box lost exactly the nine
+pointer checks, which is the documented shape of a *performance* regression.
+It was contention, not code. Kill the other browsers before believing that
+block.
+
 **2026-09-10 — eye-candy pass: ten items, all shipped. Interaction suite 67/67.**
 
 The reported "pixelated nebulae" were the raymarch being stretched, not the

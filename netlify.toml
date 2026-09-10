@@ -24,11 +24,17 @@
     Cache-Control = "public, max-age=31536000, immutable"
 
 # Always revalidate the worker so a new deploy actually takes over.
+#
+# No `Service-Worker-Allowed` header. The worker sits at the root here, so its
+# default scope is already the whole site and the header bought nothing; but
+# Filthy Net Deck proxies this origin under `/aetherfield/`, and a header
+# passed through that proxy would let a worker registered from that path claim
+# the host's entire marketing origin. `main.ts` also asks for the narrow scope
+# explicitly — this is the other half of the same guard.
 [[headers]]
   for = "/sw.js"
   [headers.values]
     Cache-Control = "no-cache"
-    Service-Worker-Allowed = "/"
 
 [[headers]]
   for = "/manifest.webmanifest"

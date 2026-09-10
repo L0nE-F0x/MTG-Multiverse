@@ -1,18 +1,62 @@
+/*
+ * "Skip intro · Esc" — the one control that is on screen during the fly-in.
+ *
+ * It sits above the bottom chrome rather than at a fixed offset from the
+ * window. The layout switcher is three stacked rows whose combined height
+ * differs by ~30px between desktop and mobile (the description is hidden
+ * under 900px, the buttons grow to a touch target and wrap), so any constant
+ * clears it on one viewport and lands on the format row on the other — which
+ * is what it did at `bottom: 96px`. `--mcu-hud-bottom` is measured and
+ * published by `hud.ts`; the fallback is only for the frame before that runs.
+ */
 .mcu-cinematic-skip {
-  position: absolute;
-  left: 50%;
-  bottom: 96px;
-  transform: translateX(-50%);
+  position: fixed;
+  /* Centred on the space the filter panel leaves, exactly as the switcher
+     below it is — otherwise the two disagree whenever the panel is open. */
+  left: calc(50% + var(--mcu-inset-left, 0px) / 2 - var(--mcu-inset-right, 0px) / 2);
+  bottom: calc(var(--mcu-hud-bottom, 122px) + 14px);
+  translate: -50% 0;
+  max-width: calc(100vw - var(--mcu-inset-left, 0px) - var(--mcu-inset-right, 0px) - 20px);
   pointer-events: auto;
   z-index: 30;
-  padding: 8px 16px;
+  padding: 8px 18px;
   border: 1px solid var(--mcu-border-strong);
+  border-radius: 999px;
+  /* Near-opaque: this has to occlude the starfield and whatever label drifts
+     under it, and a panel-alpha fill reads as smudge over a bright arm. */
   background: rgba(9, 11, 22, 0.92);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   color: var(--mcu-text);
   font: 600 11px/1 var(--mcu-font);
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  white-space: nowrap;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  animation: mcu-panel-in 500ms var(--mcu-ease) both;
+  transition: color 200ms var(--mcu-ease), border-color 200ms var(--mcu-ease);
 }
 .mcu-cinematic-skip[hidden] { display: none; }
-.mcu-cinematic-skip:hover { color: var(--mcu-cyan); }
+.mcu-cinematic-skip:hover {
+  color: var(--mcu-cyan);
+  border-color: var(--mcu-cyan);
+}
+
+.mcu-cinematic-skip-key { color: var(--mcu-text-faint); }
+
+@media (max-width: 900px) {
+  .mcu-cinematic-skip {
+    min-height: var(--mcu-touch);
+    padding: 8px 18px;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+  }
+}
+
+/* No Escape key to press, so the hint is noise that only costs width. */
+@media (hover: none) and (pointer: coarse) {
+  .mcu-cinematic-skip-key { display: none; }
+}
